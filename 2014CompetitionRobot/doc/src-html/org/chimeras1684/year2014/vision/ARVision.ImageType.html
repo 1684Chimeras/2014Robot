@@ -1,0 +1,1467 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span>/*----------------------------------------------------------------------------*/<a name="line.1"></a>
+<span class="sourceLineNo">002</span>/* Copyright (c) FIRST 2008-2012. All Rights Reserved.                        */<a name="line.2"></a>
+<span class="sourceLineNo">003</span>/* Open Source Software - may be modified and shared by FRC teams. The code   */<a name="line.3"></a>
+<span class="sourceLineNo">004</span>/* must be accompanied by the FIRST BSD license file in the root directory of */<a name="line.4"></a>
+<span class="sourceLineNo">005</span>/* the project.                                                               */<a name="line.5"></a>
+<span class="sourceLineNo">006</span>/*----------------------------------------------------------------------------*/<a name="line.6"></a>
+<span class="sourceLineNo">007</span>package org.chimeras1684.year2014.vision;<a name="line.7"></a>
+<span class="sourceLineNo">008</span><a name="line.8"></a>
+<span class="sourceLineNo">009</span>import com.sun.cldc.jna.BlockingFunction;<a name="line.9"></a>
+<span class="sourceLineNo">010</span>import com.sun.cldc.jna.Function;<a name="line.10"></a>
+<span class="sourceLineNo">011</span>import com.sun.cldc.jna.NativeLibrary;<a name="line.11"></a>
+<span class="sourceLineNo">012</span>import com.sun.cldc.jna.Pointer;<a name="line.12"></a>
+<span class="sourceLineNo">013</span>import com.sun.cldc.jna.Structure;<a name="line.13"></a>
+<span class="sourceLineNo">014</span>import com.sun.cldc.jna.TaskExecutor;<a name="line.14"></a>
+<span class="sourceLineNo">015</span>import com.sun.cldc.jna.ptr.IntByReference;<a name="line.15"></a>
+<span class="sourceLineNo">016</span>import edu.wpi.first.wpilibj.image.CriteriaCollection;<a name="line.16"></a>
+<span class="sourceLineNo">017</span>import edu.wpi.first.wpilibj.image.CurveOptions;<a name="line.17"></a>
+<span class="sourceLineNo">018</span>import edu.wpi.first.wpilibj.image.EllipseDescriptor;<a name="line.18"></a>
+<span class="sourceLineNo">019</span>import edu.wpi.first.wpilibj.image.EllipseMatch;<a name="line.19"></a>
+<span class="sourceLineNo">020</span>import edu.wpi.first.wpilibj.image.LinearAverages;<a name="line.20"></a>
+<span class="sourceLineNo">021</span>import edu.wpi.first.wpilibj.image.MonoImage;<a name="line.21"></a>
+<span class="sourceLineNo">022</span>import edu.wpi.first.wpilibj.image.NIVision;<a name="line.22"></a>
+<span class="sourceLineNo">023</span>import edu.wpi.first.wpilibj.image.NIVisionException;<a name="line.23"></a>
+<span class="sourceLineNo">024</span>import edu.wpi.first.wpilibj.image.RegionOfInterest;<a name="line.24"></a>
+<span class="sourceLineNo">025</span>import edu.wpi.first.wpilibj.image.ShapeDetectionOptions;<a name="line.25"></a>
+<span class="sourceLineNo">026</span>import edu.wpi.first.wpilibj.util.BoundaryException;<a name="line.26"></a>
+<span class="sourceLineNo">027</span><a name="line.27"></a>
+<span class="sourceLineNo">028</span>/**<a name="line.28"></a>
+<span class="sourceLineNo">029</span> * Class for interfacing with the NIVision libraries<a name="line.29"></a>
+<span class="sourceLineNo">030</span> * @author dtjones<a name="line.30"></a>
+<span class="sourceLineNo">031</span> */<a name="line.31"></a>
+<span class="sourceLineNo">032</span>public class ARVision {<a name="line.32"></a>
+<span class="sourceLineNo">033</span><a name="line.33"></a>
+<span class="sourceLineNo">034</span>    private ARVision() {<a name="line.34"></a>
+<span class="sourceLineNo">035</span>    }<a name="line.35"></a>
+<span class="sourceLineNo">036</span><a name="line.36"></a>
+<span class="sourceLineNo">037</span>    private static final TaskExecutor taskExecutor = new TaskExecutor("nivision task");<a name="line.37"></a>
+<span class="sourceLineNo">038</span><a name="line.38"></a>
+<span class="sourceLineNo">039</span>    /**<a name="line.39"></a>
+<span class="sourceLineNo">040</span>     * Enumeration representing the possible types of imaq images<a name="line.40"></a>
+<span class="sourceLineNo">041</span>     */<a name="line.41"></a>
+<span class="sourceLineNo">042</span>    public static class ImageType {<a name="line.42"></a>
+<span class="sourceLineNo">043</span><a name="line.43"></a>
+<span class="sourceLineNo">044</span>        public final int value;<a name="line.44"></a>
+<span class="sourceLineNo">045</span>        /** The image type is 8-bit unsigned integer grayscale. */<a name="line.45"></a>
+<span class="sourceLineNo">046</span>        public static final ImageType imaqImageU8 = new ImageType(0);<a name="line.46"></a>
+<span class="sourceLineNo">047</span>        /** The image type is 16-bit unsigned integer grayscale. */<a name="line.47"></a>
+<span class="sourceLineNo">048</span>        public static final ImageType imaqImageU16 = new ImageType(7);<a name="line.48"></a>
+<span class="sourceLineNo">049</span>        /** The image type is 16-bit signed integer grayscale. */<a name="line.49"></a>
+<span class="sourceLineNo">050</span>        public static final ImageType imaqImageI16 = new ImageType(1);<a name="line.50"></a>
+<span class="sourceLineNo">051</span>        /** The image type is 32-bit floating-point grayscale. */<a name="line.51"></a>
+<span class="sourceLineNo">052</span>        public static final ImageType imaqImageSGL = new ImageType(2);<a name="line.52"></a>
+<span class="sourceLineNo">053</span>        /** The image type is complex. */<a name="line.53"></a>
+<span class="sourceLineNo">054</span>        public static final ImageType imaqImageComplex = new ImageType(3);<a name="line.54"></a>
+<span class="sourceLineNo">055</span>        /** The image type is RGB color. */<a name="line.55"></a>
+<span class="sourceLineNo">056</span>        public static final ImageType imaqImageRGB = new ImageType(4);<a name="line.56"></a>
+<span class="sourceLineNo">057</span>        /** The image type is HSL color. */<a name="line.57"></a>
+<span class="sourceLineNo">058</span>        public static final ImageType imaqImageHSL = new ImageType(5);<a name="line.58"></a>
+<span class="sourceLineNo">059</span>        /** The image type is 64-bit unsigned RGB color. */<a name="line.59"></a>
+<span class="sourceLineNo">060</span>        public static final ImageType imaqImageRGBU64 = new ImageType(6);<a name="line.60"></a>
+<span class="sourceLineNo">061</span>        /** Reserved */<a name="line.61"></a>
+<span class="sourceLineNo">062</span>        public static final ImageType imaqImageTypeSizeGuard = new ImageType(0xFFFFFFFF);<a name="line.62"></a>
+<span class="sourceLineNo">063</span><a name="line.63"></a>
+<span class="sourceLineNo">064</span>        private ImageType(int value) {<a name="line.64"></a>
+<span class="sourceLineNo">065</span>            this.value = value;<a name="line.65"></a>
+<span class="sourceLineNo">066</span>        }<a name="line.66"></a>
+<span class="sourceLineNo">067</span>    }<a name="line.67"></a>
+<span class="sourceLineNo">068</span><a name="line.68"></a>
+<span class="sourceLineNo">069</span>    /**<a name="line.69"></a>
+<span class="sourceLineNo">070</span>     * Enumerations representing the possible color spaces to operate in<a name="line.70"></a>
+<span class="sourceLineNo">071</span>     */<a name="line.71"></a>
+<span class="sourceLineNo">072</span>    public static class ColorMode {<a name="line.72"></a>
+<span class="sourceLineNo">073</span><a name="line.73"></a>
+<span class="sourceLineNo">074</span>        public final int value;<a name="line.74"></a>
+<span class="sourceLineNo">075</span>        /** The function operates in the RGB (Red, Blue, Green) color space. */<a name="line.75"></a>
+<span class="sourceLineNo">076</span>        public static final ColorMode IMAQ_RGB = new ColorMode(0);<a name="line.76"></a>
+<span class="sourceLineNo">077</span>        /** The function operates in the HSL (Hue, Saturation, Luminance) color space. */<a name="line.77"></a>
+<span class="sourceLineNo">078</span>        public static final ColorMode IMAQ_HSL = new ColorMode(1);<a name="line.78"></a>
+<span class="sourceLineNo">079</span>        /** The function operates in the HSV (Hue, Saturation, Value) color space. */<a name="line.79"></a>
+<span class="sourceLineNo">080</span>        public static final ColorMode IMAQ_HSV = new ColorMode(2);<a name="line.80"></a>
+<span class="sourceLineNo">081</span>        /** The function operates in the HSI (Hue, Saturation, Intensity) color space. */<a name="line.81"></a>
+<span class="sourceLineNo">082</span>        public static final ColorMode IMAQ_HSI = new ColorMode(3);<a name="line.82"></a>
+<span class="sourceLineNo">083</span>        /** The function operates in the CIE L*a*b* color space. */<a name="line.83"></a>
+<span class="sourceLineNo">084</span>        public static final ColorMode IMAQ_CIE = new ColorMode(4);<a name="line.84"></a>
+<span class="sourceLineNo">085</span>        /** The function operates in the CIE XYZ color space. */<a name="line.85"></a>
+<span class="sourceLineNo">086</span>        public static final ColorMode IMAQ_CIEXYZ = new ColorMode(5);<a name="line.86"></a>
+<span class="sourceLineNo">087</span>        public static final ColorMode IMAQ_COLOR_MODE_SIZE_GUARD = new ColorMode(0xFFFFFFFF);<a name="line.87"></a>
+<span class="sourceLineNo">088</span><a name="line.88"></a>
+<span class="sourceLineNo">089</span>        private ColorMode(int value) {<a name="line.89"></a>
+<span class="sourceLineNo">090</span>            this.value = value;<a name="line.90"></a>
+<span class="sourceLineNo">091</span>        }<a name="line.91"></a>
+<span class="sourceLineNo">092</span>    }<a name="line.92"></a>
+<span class="sourceLineNo">093</span><a name="line.93"></a>
+<span class="sourceLineNo">094</span>    public static class MeasurementType {<a name="line.94"></a>
+<span class="sourceLineNo">095</span><a name="line.95"></a>
+<span class="sourceLineNo">096</span>        public final int value;<a name="line.96"></a>
+<span class="sourceLineNo">097</span>        /** X-coordinate of the point representing the average position of the total particle mass, assuming every point in the particle has a constant density. */<a name="line.97"></a>
+<span class="sourceLineNo">098</span>        public static final MeasurementType IMAQ_MT_CENTER_OF_MASS_X = new MeasurementType(0);<a name="line.98"></a>
+<span class="sourceLineNo">099</span>        /** Y-coordinate of the point representing the average position of the total particle mass, assuming every point in the particle has a constant density. */<a name="line.99"></a>
+<span class="sourceLineNo">100</span>        public static final MeasurementType IMAQ_MT_CENTER_OF_MASS_Y = new MeasurementType(1);<a name="line.100"></a>
+<span class="sourceLineNo">101</span>        /** X-coordinate of the highest, leftmost particle pixel. */<a name="line.101"></a>
+<span class="sourceLineNo">102</span>        public static final MeasurementType IMAQ_MT_FIRST_PIXEL_X = new MeasurementType(2);<a name="line.102"></a>
+<span class="sourceLineNo">103</span>        /** Y-coordinate of the highest, leftmost particle pixel. */<a name="line.103"></a>
+<span class="sourceLineNo">104</span>        public static final MeasurementType IMAQ_MT_FIRST_PIXEL_Y = new MeasurementType(3);<a name="line.104"></a>
+<span class="sourceLineNo">105</span>        /** X-coordinate of the leftmost particle point. */<a name="line.105"></a>
+<span class="sourceLineNo">106</span>        public static final MeasurementType IMAQ_MT_BOUNDING_RECT_LEFT = new MeasurementType(4);<a name="line.106"></a>
+<span class="sourceLineNo">107</span>        /** Y-coordinate of highest particle point. */<a name="line.107"></a>
+<span class="sourceLineNo">108</span>        public static final MeasurementType IMAQ_MT_BOUNDING_RECT_TOP = new MeasurementType(5);<a name="line.108"></a>
+<span class="sourceLineNo">109</span>        /** X-coordinate of the rightmost particle point. */<a name="line.109"></a>
+<span class="sourceLineNo">110</span>        public static final MeasurementType IMAQ_MT_BOUNDING_RECT_RIGHT = new MeasurementType(6);<a name="line.110"></a>
+<span class="sourceLineNo">111</span>        /** Y-coordinate of the lowest particle point. */<a name="line.111"></a>
+<span class="sourceLineNo">112</span>        public static final MeasurementType IMAQ_MT_BOUNDING_RECT_BOTTOM = new MeasurementType(7);<a name="line.112"></a>
+<span class="sourceLineNo">113</span>        /** X-coordinate of the start of the line segment connecting the two perimeter points that are the furthest apart. */<a name="line.113"></a>
+<span class="sourceLineNo">114</span>        public static final MeasurementType IMAQ_MT_MAX_FERET_DIAMETER_START_X = new MeasurementType(8);<a name="line.114"></a>
+<span class="sourceLineNo">115</span>        /** Y-coordinate of the start of the line segment connecting the two perimeter points that are the furthest apart. */<a name="line.115"></a>
+<span class="sourceLineNo">116</span>        public static final MeasurementType IMAQ_MT_MAX_FERET_DIAMETER_START_Y = new MeasurementType(9);<a name="line.116"></a>
+<span class="sourceLineNo">117</span>        /** X-coordinate of the end of the line segment connecting the two perimeter points that are the furthest apart. */<a name="line.117"></a>
+<span class="sourceLineNo">118</span>        public static final MeasurementType IMAQ_MT_MAX_FERET_DIAMETER_END_X = new MeasurementType(10);<a name="line.118"></a>
+<span class="sourceLineNo">119</span>        /** Y-coordinate of the end of the line segment connecting the two perimeter points that are the furthest apart. */<a name="line.119"></a>
+<span class="sourceLineNo">120</span>        public static final MeasurementType IMAQ_MT_MAX_FERET_DIAMETER_END_Y = new MeasurementType(11);<a name="line.120"></a>
+<span class="sourceLineNo">121</span>        /** X-coordinate of the leftmost pixel in the longest row of contiguous pixels in the particle. */<a name="line.121"></a>
+<span class="sourceLineNo">122</span>        public static final MeasurementType IMAQ_MT_MAX_HORIZ_SEGMENT_LENGTH_LEFT = new MeasurementType(12);<a name="line.122"></a>
+<span class="sourceLineNo">123</span>        /** X-coordinate of the rightmost pixel in the longest row of contiguous pixels in the particle. */<a name="line.123"></a>
+<span class="sourceLineNo">124</span>        public static final MeasurementType IMAQ_MT_MAX_HORIZ_SEGMENT_LENGTH_RIGHT = new MeasurementType(13);<a name="line.124"></a>
+<span class="sourceLineNo">125</span>        /** Y-coordinate of all of the pixels in the longest row of contiguous pixels in the particle. */<a name="line.125"></a>
+<span class="sourceLineNo">126</span>        public static final MeasurementType IMAQ_MT_MAX_HORIZ_SEGMENT_LENGTH_ROW = new MeasurementType(14);<a name="line.126"></a>
+<span class="sourceLineNo">127</span>        /** Distance between the x-coordinate of the leftmost particle point and the x-coordinate of the rightmost particle point. */<a name="line.127"></a>
+<span class="sourceLineNo">128</span>        public static final MeasurementType IMAQ_MT_BOUNDING_RECT_WIDTH = new MeasurementType(16);<a name="line.128"></a>
+<span class="sourceLineNo">129</span>        /** Distance between the y-coordinate of highest particle point and the y-coordinate of the lowest particle point. */<a name="line.129"></a>
+<span class="sourceLineNo">130</span>        public static final MeasurementType IMAQ_MT_BOUNDING_RECT_HEIGHT = new MeasurementType(17);<a name="line.130"></a>
+<span class="sourceLineNo">131</span>        /** Distance between opposite corners of the bounding rectangle. */<a name="line.131"></a>
+<span class="sourceLineNo">132</span>        public static final MeasurementType IMAQ_MT_BOUNDING_RECT_DIAGONAL = new MeasurementType(18);<a name="line.132"></a>
+<span class="sourceLineNo">133</span>        /** Length of the outer boundary of the particle. */<a name="line.133"></a>
+<span class="sourceLineNo">134</span>        public static final MeasurementType IMAQ_MT_PERIMETER = new MeasurementType(19);<a name="line.134"></a>
+<span class="sourceLineNo">135</span>        /** Perimeter of the smallest convex polygon containing all points in the particle. */<a name="line.135"></a>
+<span class="sourceLineNo">136</span>        public static final MeasurementType IMAQ_MT_CONVEX_HULL_PERIMETER = new MeasurementType(20);<a name="line.136"></a>
+<span class="sourceLineNo">137</span>        /** Sum of the perimeters of each hole in the particle. */<a name="line.137"></a>
+<span class="sourceLineNo">138</span>        public static final MeasurementType IMAQ_MT_HOLES_PERIMETER = new MeasurementType(21);<a name="line.138"></a>
+<span class="sourceLineNo">139</span>        /** Distance between the start and end of the line segment connecting the two perimeter points that are the furthest apart. */<a name="line.139"></a>
+<span class="sourceLineNo">140</span>        public static final MeasurementType IMAQ_MT_MAX_FERET_DIAMETER = new MeasurementType(22);<a name="line.140"></a>
+<span class="sourceLineNo">141</span>        /** Length of the major axis of the ellipse with the same perimeter and area as the particle. */<a name="line.141"></a>
+<span class="sourceLineNo">142</span>        public static final MeasurementType IMAQ_MT_EQUIVALENT_ELLIPSE_MAJOR_AXIS = new MeasurementType(23);<a name="line.142"></a>
+<span class="sourceLineNo">143</span>        /** Length of the minor axis of the ellipse with the same perimeter and area as the particle. */<a name="line.143"></a>
+<span class="sourceLineNo">144</span>        public static final MeasurementType IMAQ_MT_EQUIVALENT_ELLIPSE_MINOR_AXIS = new MeasurementType(24);<a name="line.144"></a>
+<span class="sourceLineNo">145</span>        /** Length of the minor axis of the ellipse with the same area as the particle, and Major Axis equal in length to the Max Feret Diameter. */<a name="line.145"></a>
+<span class="sourceLineNo">146</span>        public static final MeasurementType IMAQ_MT_EQUIVALENT_ELLIPSE_MINOR_AXIS_FERET = new MeasurementType(25);<a name="line.146"></a>
+<span class="sourceLineNo">147</span>        /** Longest side of the rectangle with the same perimeter and area as the particle. */<a name="line.147"></a>
+<span class="sourceLineNo">148</span>        public static final MeasurementType IMAQ_MT_EQUIVALENT_RECT_LONG_SIDE = new MeasurementType(26);<a name="line.148"></a>
+<span class="sourceLineNo">149</span>        /** Shortest side of the rectangle with the same perimeter and area as the particle. */<a name="line.149"></a>
+<span class="sourceLineNo">150</span>        public static final MeasurementType IMAQ_MT_EQUIVALENT_RECT_SHORT_SIDE = new MeasurementType(27);<a name="line.150"></a>
+<span class="sourceLineNo">151</span>        /** Distance between opposite corners of the rectangle with the same perimeter and area as the particle. */<a name="line.151"></a>
+<span class="sourceLineNo">152</span>        public static final MeasurementType IMAQ_MT_EQUIVALENT_RECT_DIAGONAL = new MeasurementType(28);<a name="line.152"></a>
+<span class="sourceLineNo">153</span>        /** Shortest side of the rectangle with the same area as the particle, and longest side equal in length to the Max Feret Diameter. */<a name="line.153"></a>
+<span class="sourceLineNo">154</span>        public static final MeasurementType IMAQ_MT_EQUIVALENT_RECT_SHORT_SIDE_FERET = new MeasurementType(29);<a name="line.154"></a>
+<span class="sourceLineNo">155</span>        /** Average length of a horizontal segment in the particle. */<a name="line.155"></a>
+<span class="sourceLineNo">156</span>        public static final MeasurementType IMAQ_MT_AVERAGE_HORIZ_SEGMENT_LENGTH = new MeasurementType(30);<a name="line.156"></a>
+<span class="sourceLineNo">157</span>        /** Average length of a vertical segment in the particle. */<a name="line.157"></a>
+<span class="sourceLineNo">158</span>        public static final MeasurementType IMAQ_MT_AVERAGE_VERT_SEGMENT_LENGTH = new MeasurementType(31);<a name="line.158"></a>
+<span class="sourceLineNo">159</span>        /** The particle area divided by the particle perimeter. */<a name="line.159"></a>
+<span class="sourceLineNo">160</span>        public static final MeasurementType IMAQ_MT_HYDRAULIC_RADIUS = new MeasurementType(32);<a name="line.160"></a>
+<span class="sourceLineNo">161</span>        /** Diameter of a disk with the same area as the particle. */<a name="line.161"></a>
+<span class="sourceLineNo">162</span>        public static final MeasurementType IMAQ_MT_WADDEL_DISK_DIAMETER = new MeasurementType(33);<a name="line.162"></a>
+<span class="sourceLineNo">163</span>        /** Area of the particle. */<a name="line.163"></a>
+<span class="sourceLineNo">164</span>        public static final MeasurementType IMAQ_MT_AREA = new MeasurementType(35);<a name="line.164"></a>
+<span class="sourceLineNo">165</span>        /** Sum of the areas of each hole in the particle. */<a name="line.165"></a>
+<span class="sourceLineNo">166</span>        public static final MeasurementType IMAQ_MT_HOLES_AREA = new MeasurementType(36);<a name="line.166"></a>
+<span class="sourceLineNo">167</span>        /** Area of a particle that completely covers the image. */<a name="line.167"></a>
+<span class="sourceLineNo">168</span>        public static final MeasurementType IMAQ_MT_PARTICLE_AND_HOLES_AREA = new MeasurementType(37);<a name="line.168"></a>
+<span class="sourceLineNo">169</span>        /** Area of the smallest convex polygon containing all points in the particle. */<a name="line.169"></a>
+<span class="sourceLineNo">170</span>        public static final MeasurementType IMAQ_MT_CONVEX_HULL_AREA = new MeasurementType(38);<a name="line.170"></a>
+<span class="sourceLineNo">171</span>        /** Area of the image. */<a name="line.171"></a>
+<span class="sourceLineNo">172</span>        public static final MeasurementType IMAQ_MT_IMAGE_AREA = new MeasurementType(39);<a name="line.172"></a>
+<span class="sourceLineNo">173</span>        /** Number of holes in the particle. */<a name="line.173"></a>
+<span class="sourceLineNo">174</span>        public static final MeasurementType IMAQ_MT_NUMBER_OF_HOLES = new MeasurementType(41);<a name="line.174"></a>
+<span class="sourceLineNo">175</span>        /** Number of horizontal segments in the particle. */<a name="line.175"></a>
+<span class="sourceLineNo">176</span>        public static final MeasurementType IMAQ_MT_NUMBER_OF_HORIZ_SEGMENTS = new MeasurementType(42);<a name="line.176"></a>
+<span class="sourceLineNo">177</span>        /** Number of vertical segments in the particle. */<a name="line.177"></a>
+<span class="sourceLineNo">178</span>        public static final MeasurementType IMAQ_MT_NUMBER_OF_VERT_SEGMENTS = new MeasurementType(43);<a name="line.178"></a>
+<span class="sourceLineNo">179</span>        /** The angle of the line that passes through the particle Center of Mass about which the particle has the lowest moment of inertia. */<a name="line.179"></a>
+<span class="sourceLineNo">180</span>        public static final MeasurementType IMAQ_MT_ORIENTATION = new MeasurementType(45);<a name="line.180"></a>
+<span class="sourceLineNo">181</span>        /** The angle of the line segment connecting the two perimeter points that are the furthest apart. */<a name="line.181"></a>
+<span class="sourceLineNo">182</span>        public static final MeasurementType IMAQ_MT_MAX_FERET_DIAMETER_ORIENTATION = new MeasurementType(46);<a name="line.182"></a>
+<span class="sourceLineNo">183</span>        /** Percentage of the particle Area covering the Image Area. */<a name="line.183"></a>
+<span class="sourceLineNo">184</span>        public static final MeasurementType IMAQ_MT_AREA_BY_IMAGE_AREA = new MeasurementType(48);<a name="line.184"></a>
+<span class="sourceLineNo">185</span>        /** Percentage of the particle Area in relation to its Particle and Holes Area. */<a name="line.185"></a>
+<span class="sourceLineNo">186</span>        public static final MeasurementType IMAQ_MT_AREA_BY_PARTICLE_AND_HOLES_AREA = new MeasurementType(49);<a name="line.186"></a>
+<span class="sourceLineNo">187</span>        /** Equivalent Ellipse Major Axis divided by Equivalent Ellipse Minor Axis. */<a name="line.187"></a>
+<span class="sourceLineNo">188</span>        public static final MeasurementType IMAQ_MT_RATIO_OF_EQUIVALENT_ELLIPSE_AXES = new MeasurementType(50);<a name="line.188"></a>
+<span class="sourceLineNo">189</span>        /** Equivalent Rect Long Side divided by Equivalent Rect Short Side. */<a name="line.189"></a>
+<span class="sourceLineNo">190</span>        public static final MeasurementType IMAQ_MT_RATIO_OF_EQUIVALENT_RECT_SIDES = new MeasurementType(51);<a name="line.190"></a>
+<span class="sourceLineNo">191</span>        /** Max Feret Diameter divided by Equivalent Rect Short Side (Feret). */<a name="line.191"></a>
+<span class="sourceLineNo">192</span>        public static final MeasurementType IMAQ_MT_ELONGATION_FACTOR = new MeasurementType(53);<a name="line.192"></a>
+<span class="sourceLineNo">193</span>        /** Area divided by the product of Bounding Rect Width and Bounding Rect Height. */<a name="line.193"></a>
+<span class="sourceLineNo">194</span>        public static final MeasurementType IMAQ_MT_COMPACTNESS_FACTOR = new MeasurementType(54);<a name="line.194"></a>
+<span class="sourceLineNo">195</span>        /** Perimeter divided by the circumference of a circle with the same area. */<a name="line.195"></a>
+<span class="sourceLineNo">196</span>        public static final MeasurementType IMAQ_MT_HEYWOOD_CIRCULARITY_FACTOR = new MeasurementType(55);<a name="line.196"></a>
+<span class="sourceLineNo">197</span>        /** Factor relating area to moment of inertia. */<a name="line.197"></a>
+<span class="sourceLineNo">198</span>        public static final MeasurementType IMAQ_MT_TYPE_FACTOR = new MeasurementType(56);<a name="line.198"></a>
+<span class="sourceLineNo">199</span>        /** The sum of all x-coordinates in the particle. */<a name="line.199"></a>
+<span class="sourceLineNo">200</span>        public static final MeasurementType IMAQ_MT_SUM_X = new MeasurementType(58);<a name="line.200"></a>
+<span class="sourceLineNo">201</span>        /** The sum of all y-coordinates in the particle. */<a name="line.201"></a>
+<span class="sourceLineNo">202</span>        public static final MeasurementType IMAQ_MT_SUM_Y = new MeasurementType(59);<a name="line.202"></a>
+<span class="sourceLineNo">203</span>        /** The sum of all x-coordinates squared in the particle. */<a name="line.203"></a>
+<span class="sourceLineNo">204</span>        public static final MeasurementType IMAQ_MT_SUM_XX = new MeasurementType(60);<a name="line.204"></a>
+<span class="sourceLineNo">205</span>        /** The sum of all x-coordinates times y-coordinates in the particle. */<a name="line.205"></a>
+<span class="sourceLineNo">206</span>        public static final MeasurementType IMAQ_MT_SUM_XY = new MeasurementType(61);<a name="line.206"></a>
+<span class="sourceLineNo">207</span>        /** The sum of all y-coordinates squared in the particle. */<a name="line.207"></a>
+<span class="sourceLineNo">208</span>        public static final MeasurementType IMAQ_MT_SUM_YY = new MeasurementType(62);<a name="line.208"></a>
+<span class="sourceLineNo">209</span>        /** The sum of all x-coordinates cubed in the particle. */<a name="line.209"></a>
+<span class="sourceLineNo">210</span>        public static final MeasurementType IMAQ_MT_SUM_XXX = new MeasurementType(63);<a name="line.210"></a>
+<span class="sourceLineNo">211</span>        /** The sum of all x-coordinates squared times y-coordinates in the particle. */<a name="line.211"></a>
+<span class="sourceLineNo">212</span>        public static final MeasurementType IMAQ_MT_SUM_XXY = new MeasurementType(64);<a name="line.212"></a>
+<span class="sourceLineNo">213</span>        /** The sum of all x-coordinates times y-coordinates squared in the particle. */<a name="line.213"></a>
+<span class="sourceLineNo">214</span>        public static final MeasurementType IMAQ_MT_SUM_XYY = new MeasurementType(65);<a name="line.214"></a>
+<span class="sourceLineNo">215</span>        /** The sum of all y-coordinates cubed in the particle. */<a name="line.215"></a>
+<span class="sourceLineNo">216</span>        public static final MeasurementType IMAQ_MT_SUM_YYY = new MeasurementType(66);<a name="line.216"></a>
+<span class="sourceLineNo">217</span>        /** The moment of inertia in the x-direction twice. */<a name="line.217"></a>
+<span class="sourceLineNo">218</span>        public static final MeasurementType IMAQ_MT_MOMENT_OF_INERTIA_XX = new MeasurementType(68);<a name="line.218"></a>
+<span class="sourceLineNo">219</span>        /** The moment of inertia in the x and y directions. */<a name="line.219"></a>
+<span class="sourceLineNo">220</span>        public static final MeasurementType IMAQ_MT_MOMENT_OF_INERTIA_XY = new MeasurementType(69);<a name="line.220"></a>
+<span class="sourceLineNo">221</span>        /** The moment of inertia in the y-direction twice. */<a name="line.221"></a>
+<span class="sourceLineNo">222</span>        public static final MeasurementType IMAQ_MT_MOMENT_OF_INERTIA_YY = new MeasurementType(70);<a name="line.222"></a>
+<span class="sourceLineNo">223</span>        /** The moment of inertia in the x-direction three times. */<a name="line.223"></a>
+<span class="sourceLineNo">224</span>        public static final MeasurementType IMAQ_MT_MOMENT_OF_INERTIA_XXX = new MeasurementType(71);<a name="line.224"></a>
+<span class="sourceLineNo">225</span>        /** The moment of inertia in the x-direction twice and the y-direction once. */<a name="line.225"></a>
+<span class="sourceLineNo">226</span>        public static final MeasurementType IMAQ_MT_MOMENT_OF_INERTIA_XXY = new MeasurementType(72);<a name="line.226"></a>
+<span class="sourceLineNo">227</span>        /** The moment of inertia in the x-direction once and the y-direction twice. */<a name="line.227"></a>
+<span class="sourceLineNo">228</span>        public static final MeasurementType IMAQ_MT_MOMENT_OF_INERTIA_XYY = new MeasurementType(73);<a name="line.228"></a>
+<span class="sourceLineNo">229</span>        /** The moment of inertia in the y-direction three times. */<a name="line.229"></a>
+<span class="sourceLineNo">230</span>        public static final MeasurementType IMAQ_MT_MOMENT_OF_INERTIA_YYY = new MeasurementType(74);<a name="line.230"></a>
+<span class="sourceLineNo">231</span>        /** The normalized moment of inertia in the x-direction twice. */<a name="line.231"></a>
+<span class="sourceLineNo">232</span>        public static final MeasurementType IMAQ_MT_NORM_MOMENT_OF_INERTIA_XX = new MeasurementType(75);<a name="line.232"></a>
+<span class="sourceLineNo">233</span>        /** The normalized moment of inertia in the x- and y-directions. */<a name="line.233"></a>
+<span class="sourceLineNo">234</span>        public static final MeasurementType IMAQ_MT_NORM_MOMENT_OF_INERTIA_XY = new MeasurementType(76);<a name="line.234"></a>
+<span class="sourceLineNo">235</span>        /** The normalized moment of inertia in the y-direction twice. */<a name="line.235"></a>
+<span class="sourceLineNo">236</span>        public static final MeasurementType IMAQ_MT_NORM_MOMENT_OF_INERTIA_YY = new MeasurementType(77);<a name="line.236"></a>
+<span class="sourceLineNo">237</span>        /** The normalized moment of inertia in the x-direction three times. */<a name="line.237"></a>
+<span class="sourceLineNo">238</span>        public static final MeasurementType IMAQ_MT_NORM_MOMENT_OF_INERTIA_XXX = new MeasurementType(78);<a name="line.238"></a>
+<span class="sourceLineNo">239</span>        /** The normalized moment of inertia in the x-direction twice and the y-direction once. */<a name="line.239"></a>
+<span class="sourceLineNo">240</span>        public static final MeasurementType IMAQ_MT_NORM_MOMENT_OF_INERTIA_XXY = new MeasurementType(79);<a name="line.240"></a>
+<span class="sourceLineNo">241</span>        /** The normalized moment of inertia in the x-direction once and the y-direction twice. */<a name="line.241"></a>
+<span class="sourceLineNo">242</span>        public static final MeasurementType IMAQ_MT_NORM_MOMENT_OF_INERTIA_XYY = new MeasurementType(80);<a name="line.242"></a>
+<span class="sourceLineNo">243</span>        /** The normalized moment of inertia in the y-direction three times. */<a name="line.243"></a>
+<span class="sourceLineNo">244</span>        public static final MeasurementType IMAQ_MT_NORM_MOMENT_OF_INERTIA_YYY = new MeasurementType(81);<a name="line.244"></a>
+<span class="sourceLineNo">245</span>        /** The first Hu moment. */<a name="line.245"></a>
+<span class="sourceLineNo">246</span>        public static final MeasurementType IMAQ_MT_HU_MOMENT_1 = new MeasurementType(82);<a name="line.246"></a>
+<span class="sourceLineNo">247</span>        /** The second Hu moment. */<a name="line.247"></a>
+<span class="sourceLineNo">248</span>        public static final MeasurementType IMAQ_MT_HU_MOMENT_2 = new MeasurementType(83);<a name="line.248"></a>
+<span class="sourceLineNo">249</span>        /** The third Hu moment. */<a name="line.249"></a>
+<span class="sourceLineNo">250</span>        public static final MeasurementType IMAQ_MT_HU_MOMENT_3 = new MeasurementType(84);<a name="line.250"></a>
+<span class="sourceLineNo">251</span>        /** The fourth Hu moment. */<a name="line.251"></a>
+<span class="sourceLineNo">252</span>        public static final MeasurementType IMAQ_MT_HU_MOMENT_4 = new MeasurementType(85);<a name="line.252"></a>
+<span class="sourceLineNo">253</span>        /** The fifth Hu moment. */<a name="line.253"></a>
+<span class="sourceLineNo">254</span>        public static final MeasurementType IMAQ_MT_HU_MOMENT_5 = new MeasurementType(86);<a name="line.254"></a>
+<span class="sourceLineNo">255</span>        /** The sixth Hu moment. */<a name="line.255"></a>
+<span class="sourceLineNo">256</span>        public static final MeasurementType IMAQ_MT_HU_MOMENT_6 = new MeasurementType(87);<a name="line.256"></a>
+<span class="sourceLineNo">257</span>        /** The seventh Hu moment. */<a name="line.257"></a>
+<span class="sourceLineNo">258</span>        public static final MeasurementType IMAQ_MT_HU_MOMENT_7 = new MeasurementType(88);<a name="line.258"></a>
+<span class="sourceLineNo">259</span><a name="line.259"></a>
+<span class="sourceLineNo">260</span>        public static final MeasurementType IMAQ_MEASUREMENT_TYPE_SIZE_GUARD = new MeasurementType(0xFFFFFFFF);<a name="line.260"></a>
+<span class="sourceLineNo">261</span><a name="line.261"></a>
+<span class="sourceLineNo">262</span>        private MeasurementType(int value) {<a name="line.262"></a>
+<span class="sourceLineNo">263</span>            this.value = value;<a name="line.263"></a>
+<span class="sourceLineNo">264</span>        }<a name="line.264"></a>
+<span class="sourceLineNo">265</span>    }<a name="line.265"></a>
+<span class="sourceLineNo">266</span>    <a name="line.266"></a>
+<span class="sourceLineNo">267</span>    public static class Range extends Structure {<a name="line.267"></a>
+<span class="sourceLineNo">268</span><a name="line.268"></a>
+<span class="sourceLineNo">269</span>        int lower;<a name="line.269"></a>
+<span class="sourceLineNo">270</span>        int upper;<a name="line.270"></a>
+<span class="sourceLineNo">271</span><a name="line.271"></a>
+<span class="sourceLineNo">272</span>        public void read() {<a name="line.272"></a>
+<span class="sourceLineNo">273</span>            lower = backingNativeMemory.getInt(0);<a name="line.273"></a>
+<span class="sourceLineNo">274</span>            upper = backingNativeMemory.getInt(4);<a name="line.274"></a>
+<span class="sourceLineNo">275</span>        }<a name="line.275"></a>
+<span class="sourceLineNo">276</span><a name="line.276"></a>
+<span class="sourceLineNo">277</span>        public void write() {<a name="line.277"></a>
+<span class="sourceLineNo">278</span>            backingNativeMemory.setInt(0, lower);<a name="line.278"></a>
+<span class="sourceLineNo">279</span>            backingNativeMemory.setInt(4, upper);<a name="line.279"></a>
+<span class="sourceLineNo">280</span>        }<a name="line.280"></a>
+<span class="sourceLineNo">281</span><a name="line.281"></a>
+<span class="sourceLineNo">282</span>        public int size() {<a name="line.282"></a>
+<span class="sourceLineNo">283</span>            return 8;<a name="line.283"></a>
+<span class="sourceLineNo">284</span>        }<a name="line.284"></a>
+<span class="sourceLineNo">285</span><a name="line.285"></a>
+<span class="sourceLineNo">286</span>        /**<a name="line.286"></a>
+<span class="sourceLineNo">287</span>         * Free the memory used by this range<a name="line.287"></a>
+<span class="sourceLineNo">288</span>         */<a name="line.288"></a>
+<span class="sourceLineNo">289</span>        public void free() {<a name="line.289"></a>
+<span class="sourceLineNo">290</span>            release();<a name="line.290"></a>
+<span class="sourceLineNo">291</span>        }<a name="line.291"></a>
+<span class="sourceLineNo">292</span><a name="line.292"></a>
+<span class="sourceLineNo">293</span>        /**<a name="line.293"></a>
+<span class="sourceLineNo">294</span>         * Create a new range with the specified upper and lower boundaries<a name="line.294"></a>
+<span class="sourceLineNo">295</span>         * @param lower The lower limit<a name="line.295"></a>
+<span class="sourceLineNo">296</span>         * @param upper The upper limit<a name="line.296"></a>
+<span class="sourceLineNo">297</span>         */<a name="line.297"></a>
+<span class="sourceLineNo">298</span>        public Range(final int lower, final int upper) {<a name="line.298"></a>
+<span class="sourceLineNo">299</span>            allocateMemory();<a name="line.299"></a>
+<span class="sourceLineNo">300</span>            set(lower, upper);<a name="line.300"></a>
+<span class="sourceLineNo">301</span>        }<a name="line.301"></a>
+<span class="sourceLineNo">302</span><a name="line.302"></a>
+<span class="sourceLineNo">303</span>        /**<a name="line.303"></a>
+<span class="sourceLineNo">304</span>         * Set the upper and lower boundaries<a name="line.304"></a>
+<span class="sourceLineNo">305</span>         * @param lower The lower limit<a name="line.305"></a>
+<span class="sourceLineNo">306</span>         * @param upper The upper limit<a name="line.306"></a>
+<span class="sourceLineNo">307</span>         */<a name="line.307"></a>
+<span class="sourceLineNo">308</span>        public void set(final int lower, final int upper) {<a name="line.308"></a>
+<span class="sourceLineNo">309</span>            if (lower &gt; upper) {<a name="line.309"></a>
+<span class="sourceLineNo">310</span>                throw new BoundaryException("Lower boundary is greater than upper");<a name="line.310"></a>
+<span class="sourceLineNo">311</span>            }<a name="line.311"></a>
+<span class="sourceLineNo">312</span>            this.lower = lower;<a name="line.312"></a>
+<span class="sourceLineNo">313</span>            this.upper = upper;<a name="line.313"></a>
+<span class="sourceLineNo">314</span>            write();<a name="line.314"></a>
+<span class="sourceLineNo">315</span>        }<a name="line.315"></a>
+<span class="sourceLineNo">316</span><a name="line.316"></a>
+<span class="sourceLineNo">317</span>        /**<a name="line.317"></a>
+<span class="sourceLineNo">318</span>         * Get the lower boundary<a name="line.318"></a>
+<span class="sourceLineNo">319</span>         * @return The lower boundary.<a name="line.319"></a>
+<span class="sourceLineNo">320</span>         */<a name="line.320"></a>
+<span class="sourceLineNo">321</span>        public int getLower() {<a name="line.321"></a>
+<span class="sourceLineNo">322</span>            read();<a name="line.322"></a>
+<span class="sourceLineNo">323</span>            return lower;<a name="line.323"></a>
+<span class="sourceLineNo">324</span>        }<a name="line.324"></a>
+<span class="sourceLineNo">325</span><a name="line.325"></a>
+<span class="sourceLineNo">326</span>        /**<a name="line.326"></a>
+<span class="sourceLineNo">327</span>         * Get the upper boundary<a name="line.327"></a>
+<span class="sourceLineNo">328</span>         * @return The upper boundary.<a name="line.328"></a>
+<span class="sourceLineNo">329</span>         */<a name="line.329"></a>
+<span class="sourceLineNo">330</span>        public int getUpper() {<a name="line.330"></a>
+<span class="sourceLineNo">331</span>            read();<a name="line.331"></a>
+<span class="sourceLineNo">332</span>            return upper;<a name="line.332"></a>
+<span class="sourceLineNo">333</span>        }<a name="line.333"></a>
+<span class="sourceLineNo">334</span>    }<a name="line.334"></a>
+<span class="sourceLineNo">335</span>    <a name="line.335"></a>
+<span class="sourceLineNo">336</span>    public static class Rect extends Structure {<a name="line.336"></a>
+<span class="sourceLineNo">337</span><a name="line.337"></a>
+<span class="sourceLineNo">338</span>        int top;<a name="line.338"></a>
+<span class="sourceLineNo">339</span>        int left;<a name="line.339"></a>
+<span class="sourceLineNo">340</span>        int height;<a name="line.340"></a>
+<span class="sourceLineNo">341</span>        int width;<a name="line.341"></a>
+<span class="sourceLineNo">342</span><a name="line.342"></a>
+<span class="sourceLineNo">343</span>        public void read() {<a name="line.343"></a>
+<span class="sourceLineNo">344</span>            top = backingNativeMemory.getInt(0);<a name="line.344"></a>
+<span class="sourceLineNo">345</span>            left = backingNativeMemory.getInt(4);<a name="line.345"></a>
+<span class="sourceLineNo">346</span>            height = backingNativeMemory.getInt(8);<a name="line.346"></a>
+<span class="sourceLineNo">347</span>            width = backingNativeMemory.getInt(12);<a name="line.347"></a>
+<span class="sourceLineNo">348</span>        }<a name="line.348"></a>
+<span class="sourceLineNo">349</span><a name="line.349"></a>
+<span class="sourceLineNo">350</span>        public void write() {<a name="line.350"></a>
+<span class="sourceLineNo">351</span>            backingNativeMemory.setInt(0, top);<a name="line.351"></a>
+<span class="sourceLineNo">352</span>            backingNativeMemory.setInt(4, left);<a name="line.352"></a>
+<span class="sourceLineNo">353</span>            backingNativeMemory.setInt(8, height);<a name="line.353"></a>
+<span class="sourceLineNo">354</span>            backingNativeMemory.setInt(12, width);<a name="line.354"></a>
+<span class="sourceLineNo">355</span>        }<a name="line.355"></a>
+<span class="sourceLineNo">356</span><a name="line.356"></a>
+<span class="sourceLineNo">357</span>        public int size() {<a name="line.357"></a>
+<span class="sourceLineNo">358</span>            return 16;<a name="line.358"></a>
+<span class="sourceLineNo">359</span>        }<a name="line.359"></a>
+<span class="sourceLineNo">360</span><a name="line.360"></a>
+<span class="sourceLineNo">361</span>        /**<a name="line.361"></a>
+<span class="sourceLineNo">362</span>         * Free the memory used by this range<a name="line.362"></a>
+<span class="sourceLineNo">363</span>         */<a name="line.363"></a>
+<span class="sourceLineNo">364</span>        public void free() {<a name="line.364"></a>
+<span class="sourceLineNo">365</span>            release();<a name="line.365"></a>
+<span class="sourceLineNo">366</span>        }<a name="line.366"></a>
+<span class="sourceLineNo">367</span><a name="line.367"></a>
+<span class="sourceLineNo">368</span>        /**<a name="line.368"></a>
+<span class="sourceLineNo">369</span>         * Create a new Rect with the specified dimensions<a name="line.369"></a>
+<span class="sourceLineNo">370</span>         * @param top  The top of the rectangle<a name="line.370"></a>
+<span class="sourceLineNo">371</span>         * @param left The left edge of the rectangle<a name="line.371"></a>
+<span class="sourceLineNo">372</span>         * @param height The height of the rectangle<a name="line.372"></a>
+<span class="sourceLineNo">373</span>         * @param width The width of the rectangle<a name="line.373"></a>
+<span class="sourceLineNo">374</span>         */<a name="line.374"></a>
+<span class="sourceLineNo">375</span>        public Rect(final int top, final int left, final int height, final int width) {<a name="line.375"></a>
+<span class="sourceLineNo">376</span>            allocateMemory();<a name="line.376"></a>
+<span class="sourceLineNo">377</span>            set(top, left, height, width);<a name="line.377"></a>
+<span class="sourceLineNo">378</span>        }<a name="line.378"></a>
+<span class="sourceLineNo">379</span><a name="line.379"></a>
+<span class="sourceLineNo">380</span>        /**<a name="line.380"></a>
+<span class="sourceLineNo">381</span>         * Set the Rect dimensions<a name="line.381"></a>
+<span class="sourceLineNo">382</span>         * @param top  The top of the rectangle<a name="line.382"></a>
+<span class="sourceLineNo">383</span>         * @param left The left edge of the rectangle<a name="line.383"></a>
+<span class="sourceLineNo">384</span>         * @param height The height of the rectangle<a name="line.384"></a>
+<span class="sourceLineNo">385</span>         * @param width The width of the rectangle<a name="line.385"></a>
+<span class="sourceLineNo">386</span>         */<a name="line.386"></a>
+<span class="sourceLineNo">387</span>        public void set(final int top, final int left, final int height, final int width) {<a name="line.387"></a>
+<span class="sourceLineNo">388</span>            this.top = top;<a name="line.388"></a>
+<span class="sourceLineNo">389</span>            this.left = left;<a name="line.389"></a>
+<span class="sourceLineNo">390</span>            this.height = height;<a name="line.390"></a>
+<span class="sourceLineNo">391</span>            this.width = width;<a name="line.391"></a>
+<span class="sourceLineNo">392</span>            write();<a name="line.392"></a>
+<span class="sourceLineNo">393</span>        }<a name="line.393"></a>
+<span class="sourceLineNo">394</span><a name="line.394"></a>
+<span class="sourceLineNo">395</span>        /**<a name="line.395"></a>
+<span class="sourceLineNo">396</span>         * Get the top of the rectangle<a name="line.396"></a>
+<span class="sourceLineNo">397</span>         * @return The top edge of the rectangle in pixels, measured from the top of the image<a name="line.397"></a>
+<span class="sourceLineNo">398</span>         */<a name="line.398"></a>
+<span class="sourceLineNo">399</span>        public int getTop() {<a name="line.399"></a>
+<span class="sourceLineNo">400</span>            read();<a name="line.400"></a>
+<span class="sourceLineNo">401</span>            return top;<a name="line.401"></a>
+<span class="sourceLineNo">402</span>        }<a name="line.402"></a>
+<span class="sourceLineNo">403</span><a name="line.403"></a>
+<span class="sourceLineNo">404</span>        /**<a name="line.404"></a>
+<span class="sourceLineNo">405</span>         * Get the left edge of the rectangle<a name="line.405"></a>
+<span class="sourceLineNo">406</span>         * @return The left edge of the rectangle in pixels measured from the left of the image<a name="line.406"></a>
+<span class="sourceLineNo">407</span>         */<a name="line.407"></a>
+<span class="sourceLineNo">408</span>        public int getLeft() {<a name="line.408"></a>
+<span class="sourceLineNo">409</span>            read();<a name="line.409"></a>
+<span class="sourceLineNo">410</span>            return left;<a name="line.410"></a>
+<span class="sourceLineNo">411</span>        }<a name="line.411"></a>
+<span class="sourceLineNo">412</span><a name="line.412"></a>
+<span class="sourceLineNo">413</span>        /**<a name="line.413"></a>
+<span class="sourceLineNo">414</span>         * Get the width of the rectangle<a name="line.414"></a>
+<span class="sourceLineNo">415</span>         * @return The width of the rectangle in pixels<a name="line.415"></a>
+<span class="sourceLineNo">416</span>         */<a name="line.416"></a>
+<span class="sourceLineNo">417</span>        public int getWidth() {<a name="line.417"></a>
+<span class="sourceLineNo">418</span>            read();<a name="line.418"></a>
+<span class="sourceLineNo">419</span>            return width;<a name="line.419"></a>
+<span class="sourceLineNo">420</span>        }<a name="line.420"></a>
+<span class="sourceLineNo">421</span><a name="line.421"></a>
+<span class="sourceLineNo">422</span>        /**<a name="line.422"></a>
+<span class="sourceLineNo">423</span>         * Get the height of the rectangle<a name="line.423"></a>
+<span class="sourceLineNo">424</span>         * @return The height edge of the rectangle in pixels<a name="line.424"></a>
+<span class="sourceLineNo">425</span>         */<a name="line.425"></a>
+<span class="sourceLineNo">426</span>        public int getHeight() {<a name="line.426"></a>
+<span class="sourceLineNo">427</span>            read();<a name="line.427"></a>
+<span class="sourceLineNo">428</span>            return height;<a name="line.428"></a>
+<span class="sourceLineNo">429</span>        }<a name="line.429"></a>
+<span class="sourceLineNo">430</span><a name="line.430"></a>
+<span class="sourceLineNo">431</span>    }<a name="line.431"></a>
+<span class="sourceLineNo">432</span>    <a name="line.432"></a>
+<span class="sourceLineNo">433</span>    //============================================================================<a name="line.433"></a>
+<span class="sourceLineNo">434</span>    //  Value Type handling<a name="line.434"></a>
+<span class="sourceLineNo">435</span>    // Parameters of "type" PixelValue, RGBValue, HSLValue, etc, are passed as an encoded int from Java code.<a name="line.435"></a>
+<span class="sourceLineNo">436</span>    //============================================================================<a name="line.436"></a>
+<span class="sourceLineNo">437</span>    public int encodeRGBValue(int r, int g, int b, int a) {<a name="line.437"></a>
+<span class="sourceLineNo">438</span>        return (a &amp; 0xff &lt;&lt; 24) | (r &amp; 0xff &lt;&lt; 16) | (g &amp; 0xff &lt;&lt; 8) | (b &amp; 0xff);<a name="line.438"></a>
+<span class="sourceLineNo">439</span>    }<a name="line.439"></a>
+<span class="sourceLineNo">440</span><a name="line.440"></a>
+<span class="sourceLineNo">441</span>    public int rgbGetR(int rgbvalue) {<a name="line.441"></a>
+<span class="sourceLineNo">442</span>        return (rgbvalue &gt;&gt;&gt; 16) &amp; 0xFF;<a name="line.442"></a>
+<span class="sourceLineNo">443</span>    }<a name="line.443"></a>
+<span class="sourceLineNo">444</span><a name="line.444"></a>
+<span class="sourceLineNo">445</span>    public int rgbGetG(int rgbvalue) {<a name="line.445"></a>
+<span class="sourceLineNo">446</span>        return (rgbvalue &gt;&gt;&gt; 8) &amp; 0xFF;<a name="line.446"></a>
+<span class="sourceLineNo">447</span>    }<a name="line.447"></a>
+<span class="sourceLineNo">448</span><a name="line.448"></a>
+<span class="sourceLineNo">449</span>    public int rgbGetB(int rgbvalue) {<a name="line.449"></a>
+<span class="sourceLineNo">450</span>        return (rgbvalue &gt;&gt;&gt; 0) &amp; 0xFF;<a name="line.450"></a>
+<span class="sourceLineNo">451</span>    }<a name="line.451"></a>
+<span class="sourceLineNo">452</span><a name="line.452"></a>
+<span class="sourceLineNo">453</span>    public int rgbGetA(int rgbvalue) {<a name="line.453"></a>
+<span class="sourceLineNo">454</span>        return (rgbvalue &gt;&gt;&gt; 24) &amp; 0xFF;<a name="line.454"></a>
+<span class="sourceLineNo">455</span>    }<a name="line.455"></a>
+<span class="sourceLineNo">456</span><a name="line.456"></a>
+<span class="sourceLineNo">457</span>    public int encodeHSLValue(int h, int s, int l, int a) {<a name="line.457"></a>
+<span class="sourceLineNo">458</span>        return (a &amp; 0xff &lt;&lt; 24) | (h &amp; 0xff &lt;&lt; 16) | (s &amp; 0xff &lt;&lt; 8) | (l &amp; 0xff);<a name="line.458"></a>
+<span class="sourceLineNo">459</span>    }<a name="line.459"></a>
+<span class="sourceLineNo">460</span><a name="line.460"></a>
+<span class="sourceLineNo">461</span>    public int hslGetH(int hslvalue) {<a name="line.461"></a>
+<span class="sourceLineNo">462</span>        return (hslvalue &gt;&gt;&gt; 16) &amp; 0xFF;<a name="line.462"></a>
+<span class="sourceLineNo">463</span>    }<a name="line.463"></a>
+<span class="sourceLineNo">464</span><a name="line.464"></a>
+<span class="sourceLineNo">465</span>    public int hslGetS(int hslvalue) {<a name="line.465"></a>
+<span class="sourceLineNo">466</span>        return (hslvalue &gt;&gt;&gt; 8) &amp; 0xFF;<a name="line.466"></a>
+<span class="sourceLineNo">467</span>    }<a name="line.467"></a>
+<span class="sourceLineNo">468</span><a name="line.468"></a>
+<span class="sourceLineNo">469</span>    public int hslGetL(int hslvalue) {<a name="line.469"></a>
+<span class="sourceLineNo">470</span>        return (hslvalue &gt;&gt;&gt; 0) &amp; 0xFF;<a name="line.470"></a>
+<span class="sourceLineNo">471</span>    }<a name="line.471"></a>
+<span class="sourceLineNo">472</span><a name="line.472"></a>
+<span class="sourceLineNo">473</span>    public int hslGetA(int hslvalue) {<a name="line.473"></a>
+<span class="sourceLineNo">474</span>        return (hslvalue &gt;&gt;&gt; 24) &amp; 0xFF;<a name="line.474"></a>
+<span class="sourceLineNo">475</span>    }<a name="line.475"></a>
+<span class="sourceLineNo">476</span><a name="line.476"></a>
+<span class="sourceLineNo">477</span>    public int encodeHSVValue(int h, int s, int v, int a) {<a name="line.477"></a>
+<span class="sourceLineNo">478</span>        return (a &amp; 0xff &lt;&lt; 24) | (h &amp; 0xff &lt;&lt; 16) | (s &amp; 0xff &lt;&lt; 8) | (v &amp; 0xff);<a name="line.478"></a>
+<span class="sourceLineNo">479</span>    }<a name="line.479"></a>
+<span class="sourceLineNo">480</span><a name="line.480"></a>
+<span class="sourceLineNo">481</span>    public int hsvGetH(int hsvvalue) {<a name="line.481"></a>
+<span class="sourceLineNo">482</span>        return (hsvvalue &gt;&gt;&gt; 16) &amp; 0xFF;<a name="line.482"></a>
+<span class="sourceLineNo">483</span>    }<a name="line.483"></a>
+<span class="sourceLineNo">484</span><a name="line.484"></a>
+<span class="sourceLineNo">485</span>    public int hsvGetS(int hsvvalue) {<a name="line.485"></a>
+<span class="sourceLineNo">486</span>        return (hsvvalue &gt;&gt;&gt; 8) &amp; 0xFF;<a name="line.486"></a>
+<span class="sourceLineNo">487</span>    }<a name="line.487"></a>
+<span class="sourceLineNo">488</span><a name="line.488"></a>
+<span class="sourceLineNo">489</span>    public int hsvGetV(int hsvvalue) {<a name="line.489"></a>
+<span class="sourceLineNo">490</span>        return (hsvvalue &gt;&gt;&gt; 0) &amp; 0xFF;<a name="line.490"></a>
+<span class="sourceLineNo">491</span>    }<a name="line.491"></a>
+<span class="sourceLineNo">492</span><a name="line.492"></a>
+<span class="sourceLineNo">493</span>    public int hsvGetA(int hsvvalue) {<a name="line.493"></a>
+<span class="sourceLineNo">494</span>        return (hsvvalue &gt;&gt;&gt; 24) &amp; 0xFF;<a name="line.494"></a>
+<span class="sourceLineNo">495</span>    }<a name="line.495"></a>
+<span class="sourceLineNo">496</span><a name="line.496"></a>
+<span class="sourceLineNo">497</span>    public int encodeGreyscaleValue(float greyscale) {<a name="line.497"></a>
+<span class="sourceLineNo">498</span>        return Float.floatToIntBits(greyscale);<a name="line.498"></a>
+<span class="sourceLineNo">499</span>    }<a name="line.499"></a>
+<span class="sourceLineNo">500</span><a name="line.500"></a>
+<span class="sourceLineNo">501</span>    public float decodeGreyscaleValue(int pixelValue) {<a name="line.501"></a>
+<span class="sourceLineNo">502</span>        return Float.intBitsToFloat(pixelValue);<a name="line.502"></a>
+<span class="sourceLineNo">503</span>    }<a name="line.503"></a>
+<span class="sourceLineNo">504</span><a name="line.504"></a>
+<span class="sourceLineNo">505</span>    //============================================================================<a name="line.505"></a>
+<span class="sourceLineNo">506</span>    //  Acquisition functions<a name="line.506"></a>
+<span class="sourceLineNo">507</span>    //============================================================================<a name="line.507"></a>
+<span class="sourceLineNo">508</span>    //IMAQ_FUNC Image* IMAQ_STDCALL imaqCopyFromRing(SESSION_ID sessionID, Image* image, int imageToCopy, int* imageNumber, Rect rect);<a name="line.508"></a>
+<span class="sourceLineNo">509</span>    //IMAQ_FUNC Image* IMAQ_STDCALL imaqEasyAcquire(const char* interfaceName);<a name="line.509"></a>
+<span class="sourceLineNo">510</span>    //IMAQ_FUNC Image* IMAQ_STDCALL imaqExtractFromRing(SESSION_ID sessionID, int imageToExtract, int* imageNumber);<a name="line.510"></a>
+<span class="sourceLineNo">511</span>    //IMAQ_FUNC Image* IMAQ_STDCALL imaqGrab(SESSION_ID sessionID, Image* image, int immediate);<a name="line.511"></a>
+<span class="sourceLineNo">512</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqReleaseImage(SESSION_ID sessionID);<a name="line.512"></a>
+<span class="sourceLineNo">513</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqSetupGrab(SESSION_ID sessionID, Rect rect);<a name="line.513"></a>
+<span class="sourceLineNo">514</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqSetupRing(SESSION_ID sessionID, Image** images, int numImages, int skipCount, Rect rect);<a name="line.514"></a>
+<span class="sourceLineNo">515</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqSetupSequence(SESSION_ID sessionID, Image** images, int numImages, int skipCount, Rect rect);<a name="line.515"></a>
+<span class="sourceLineNo">516</span>    //IMAQ_FUNC Image* IMAQ_STDCALL imaqSnap(SESSION_ID sessionID, Image* image, Rect rect);<a name="line.516"></a>
+<span class="sourceLineNo">517</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqStartAcquisition(SESSION_ID sessionID);<a name="line.517"></a>
+<span class="sourceLineNo">518</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqStopAcquisition(SESSION_ID sessionID);<a name="line.518"></a>
+<span class="sourceLineNo">519</span><a name="line.519"></a>
+<span class="sourceLineNo">520</span>    //============================================================================<a name="line.520"></a>
+<span class="sourceLineNo">521</span>    //  Arithmetic functions<a name="line.521"></a>
+<span class="sourceLineNo">522</span>    //============================================================================<a name="line.522"></a>
+<span class="sourceLineNo">523</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqAbsoluteDifference(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.523"></a>
+<span class="sourceLineNo">524</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqAbsoluteDifferenceConstant(Image* dest, const Image* source, PixelValue value);<a name="line.524"></a>
+<span class="sourceLineNo">525</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqAdd(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.525"></a>
+<span class="sourceLineNo">526</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqAddConstant(Image* dest, const Image* source, PixelValue value);<a name="line.526"></a>
+<span class="sourceLineNo">527</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqAverage(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.527"></a>
+<span class="sourceLineNo">528</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqAverageConstant(Image* dest, const Image* source, PixelValue value);<a name="line.528"></a>
+<span class="sourceLineNo">529</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqDivide2(Image* dest, const Image* sourceA, const Image* sourceB, RoundingMode roundingMode);<a name="line.529"></a>
+<span class="sourceLineNo">530</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqDivideConstant2(Image* dest, const Image* source, PixelValue value, RoundingMode roundingMode);<a name="line.530"></a>
+<span class="sourceLineNo">531</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqMax(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.531"></a>
+<span class="sourceLineNo">532</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqMaxConstant(Image* dest, const Image* source, PixelValue value);<a name="line.532"></a>
+<span class="sourceLineNo">533</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqMin(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.533"></a>
+<span class="sourceLineNo">534</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqMinConstant(Image* dest, const Image* source, PixelValue value);<a name="line.534"></a>
+<span class="sourceLineNo">535</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqModulo(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.535"></a>
+<span class="sourceLineNo">536</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqModuloConstant(Image* dest, const Image* source, PixelValue value);<a name="line.536"></a>
+<span class="sourceLineNo">537</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqMulDiv(Image* dest, const Image* sourceA, const Image* sourceB, float value);<a name="line.537"></a>
+<span class="sourceLineNo">538</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqMultiply(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.538"></a>
+<span class="sourceLineNo">539</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqMultiplyConstant(Image* dest, const Image* source, PixelValue value);<a name="line.539"></a>
+<span class="sourceLineNo">540</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqSubtract(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.540"></a>
+<span class="sourceLineNo">541</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqSubtractConstant(Image* dest, const Image* source, PixelValue value);<a name="line.541"></a>
+<span class="sourceLineNo">542</span><a name="line.542"></a>
+<span class="sourceLineNo">543</span>    //============================================================================<a name="line.543"></a>
+<span class="sourceLineNo">544</span>    //  Spatial Filters functions<a name="line.544"></a>
+<span class="sourceLineNo">545</span>    //============================================================================<a name="line.545"></a>
+<span class="sourceLineNo">546</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqCannyEdgeFilter(Image* dest, const Image* source, const CannyOptions* options);<a name="line.546"></a>
+<span class="sourceLineNo">547</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqConvolve2(Image* dest, Image* source, float* kernel, int matrixRows, int matrixCols, float normalize, Image* mask, RoundingMode roundingMode);<a name="line.547"></a>
+<span class="sourceLineNo">548</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqCorrelate(Image* dest, Image* source, const Image* templateImage, Rect rect);<a name="line.548"></a>
+<span class="sourceLineNo">549</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqEdgeFilter(Image* dest, Image* source, OutlineMethod method, const Image* mask);<a name="line.549"></a>
+<span class="sourceLineNo">550</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqLowPass(Image* dest, Image* source, int width, int height, float tolerance, const Image* mask);<a name="line.550"></a>
+<span class="sourceLineNo">551</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqMedianFilter(Image* dest, Image* source, int width, int height, const Image* mask);<a name="line.551"></a>
+<span class="sourceLineNo">552</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqNthOrderFilter(Image* dest, Image* source, int width, int height, int n, const Image* mask);<a name="line.552"></a>
+<span class="sourceLineNo">553</span><a name="line.553"></a>
+<span class="sourceLineNo">554</span>    //============================================================================<a name="line.554"></a>
+<span class="sourceLineNo">555</span>    //  Drawing functions<a name="line.555"></a>
+<span class="sourceLineNo">556</span>    //============================================================================<a name="line.556"></a>
+<span class="sourceLineNo">557</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqDrawLineOnImage(Image* dest, const Image* source, DrawMode mode, Point start, Point end, float newPixelValue);<a name="line.557"></a>
+<span class="sourceLineNo">558</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqDrawShapeOnImage(Image* dest, const Image* source, Rect rect, DrawMode mode, ShapeMode shape, float newPixelValue);<a name="line.558"></a>
+<span class="sourceLineNo">559</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqDrawTextOnImage(Image* dest, const Image* source, Point coord, const char* text, const DrawTextOptions* options, int* fontNameUsed);<a name="line.559"></a>
+<span class="sourceLineNo">560</span><a name="line.560"></a>
+<span class="sourceLineNo">561</span>    //============================================================================<a name="line.561"></a>
+<span class="sourceLineNo">562</span>    //  Interlacing functions<a name="line.562"></a>
+<span class="sourceLineNo">563</span>    //============================================================================<a name="line.563"></a>
+<span class="sourceLineNo">564</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqInterlaceCombine(Image* frame, const Image* odd, const Image* even);<a name="line.564"></a>
+<span class="sourceLineNo">565</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqInterlaceSeparate(const Image* frame, Image* odd, Image* even);<a name="line.565"></a>
+<span class="sourceLineNo">566</span><a name="line.566"></a>
+<span class="sourceLineNo">567</span>    //============================================================================<a name="line.567"></a>
+<span class="sourceLineNo">568</span>    //  Image Information functions<a name="line.568"></a>
+<span class="sourceLineNo">569</span>    //============================================================================<a name="line.569"></a>
+<span class="sourceLineNo">570</span>    //IMAQ_FUNC char** IMAQ_STDCALL imaqEnumerateCustomKeys(const Image* image, unsigned int* size);<a name="line.570"></a>
+<span class="sourceLineNo">571</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqGetBitDepth(const Image* image, unsigned int* bitDepth);<a name="line.571"></a>
+<span class="sourceLineNo">572</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqGetBytesPerPixel(const Image* image, int* byteCount);<a name="line.572"></a>
+<span class="sourceLineNo">573</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqGetImageInfo(const Image* image, ImageInfo* info);<a name="line.573"></a>
+<span class="sourceLineNo">574</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqGetImageType(const Image* image, ImageType* type);<a name="line.574"></a>
+<span class="sourceLineNo">575</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqGetMaskOffset(const Image* image, Point* offset);<a name="line.575"></a>
+<span class="sourceLineNo">576</span>    //IMAQ_FUNC void*  IMAQ_STDCALL imaqGetPixelAddress(const Image* image, Point pixel);<a name="line.576"></a>
+<span class="sourceLineNo">577</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqGetVisionInfoTypes(const Image* image, unsigned int* present);<a name="line.577"></a>
+<span class="sourceLineNo">578</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqIsImageEmpty(const Image* image, int* empty);<a name="line.578"></a>
+<span class="sourceLineNo">579</span>    //IMAQ_FUNC void*  IMAQ_STDCALL imaqReadCustomData(const Image* image, const char* key, unsigned int* size);<a name="line.579"></a>
+<span class="sourceLineNo">580</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqRemoveCustomData(Image* image, const char* key);<a name="line.580"></a>
+<span class="sourceLineNo">581</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqRemoveVisionInfo2(const Image* image, unsigned int info);<a name="line.581"></a>
+<span class="sourceLineNo">582</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqSetBitDepth(Image* image, unsigned int bitDepth);<a name="line.582"></a>
+<span class="sourceLineNo">583</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqSetImageSize(Image* image, int width, int height);<a name="line.583"></a>
+<span class="sourceLineNo">584</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqSetMaskOffset(Image* image, Point offset);<a name="line.584"></a>
+<span class="sourceLineNo">585</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqWriteCustomData(Image* image, const char* key, const void* data, unsigned int size);<a name="line.585"></a>
+<span class="sourceLineNo">586</span><a name="line.586"></a>
+<span class="sourceLineNo">587</span>    // TODO: Make non-blocking...<a name="line.587"></a>
+<span class="sourceLineNo">588</span>    private static final BlockingFunction imaqGetImageSizeFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqGetImageSize");<a name="line.588"></a>
+<span class="sourceLineNo">589</span>    static { imaqGetImageSizeFn.setTaskExecutor(taskExecutor); }<a name="line.589"></a>
+<span class="sourceLineNo">590</span><a name="line.590"></a>
+<span class="sourceLineNo">591</span>    /**<a name="line.591"></a>
+<span class="sourceLineNo">592</span>     * Get the height of an image.<a name="line.592"></a>
+<span class="sourceLineNo">593</span>     * @param image The image to get the height of.<a name="line.593"></a>
+<span class="sourceLineNo">594</span>     * @return The height of the image.<a name="line.594"></a>
+<span class="sourceLineNo">595</span>     */<a name="line.595"></a>
+<span class="sourceLineNo">596</span>    public static int getHeight(Pointer image)  throws NIVisionException{<a name="line.596"></a>
+<span class="sourceLineNo">597</span>        Pointer i = new Pointer(4);<a name="line.597"></a>
+<span class="sourceLineNo">598</span>        int val;<a name="line.598"></a>
+<span class="sourceLineNo">599</span>        try {<a name="line.599"></a>
+<span class="sourceLineNo">600</span>            assertCleanStatus(imaqGetImageSizeFn.call3(image, 0, i));<a name="line.600"></a>
+<span class="sourceLineNo">601</span>        } finally {<a name="line.601"></a>
+<span class="sourceLineNo">602</span>            val = i.getInt(0);<a name="line.602"></a>
+<span class="sourceLineNo">603</span>            i.free();<a name="line.603"></a>
+<span class="sourceLineNo">604</span>        }<a name="line.604"></a>
+<span class="sourceLineNo">605</span>        return val;<a name="line.605"></a>
+<span class="sourceLineNo">606</span>    }<a name="line.606"></a>
+<span class="sourceLineNo">607</span><a name="line.607"></a>
+<span class="sourceLineNo">608</span>    /**<a name="line.608"></a>
+<span class="sourceLineNo">609</span>     * Get the width of an image.<a name="line.609"></a>
+<span class="sourceLineNo">610</span>     * @param image The image to get the width of.<a name="line.610"></a>
+<span class="sourceLineNo">611</span>     * @return The width of the image.<a name="line.611"></a>
+<span class="sourceLineNo">612</span>     */<a name="line.612"></a>
+<span class="sourceLineNo">613</span>    public static int getWidth(Pointer image)  throws NIVisionException{<a name="line.613"></a>
+<span class="sourceLineNo">614</span>        Pointer i = new Pointer(4);<a name="line.614"></a>
+<span class="sourceLineNo">615</span>        int val;<a name="line.615"></a>
+<span class="sourceLineNo">616</span>        try {<a name="line.616"></a>
+<span class="sourceLineNo">617</span>            assertCleanStatus(imaqGetImageSizeFn.call3(image, i, 0));<a name="line.617"></a>
+<span class="sourceLineNo">618</span>        } finally {<a name="line.618"></a>
+<span class="sourceLineNo">619</span>            val = i.getInt(0);<a name="line.619"></a>
+<span class="sourceLineNo">620</span>            i.free();<a name="line.620"></a>
+<span class="sourceLineNo">621</span>        }<a name="line.621"></a>
+<span class="sourceLineNo">622</span>        return val;<a name="line.622"></a>
+<span class="sourceLineNo">623</span>    }<a name="line.623"></a>
+<span class="sourceLineNo">624</span><a name="line.624"></a>
+<span class="sourceLineNo">625</span>    //============================================================================<a name="line.625"></a>
+<span class="sourceLineNo">626</span>    //  Morphology functions<a name="line.626"></a>
+<span class="sourceLineNo">627</span>    //============================================================================<a name="line.627"></a>
+<span class="sourceLineNo">628</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqConvexHull(Image* dest, Image* source, int connectivity8);<a name="line.628"></a>
+<span class="sourceLineNo">629</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqDanielssonDistance(Image* dest, Image* source);<a name="line.629"></a>
+<span class="sourceLineNo">630</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqFillHoles(Image* dest, const Image* source, int connectivity8);<a name="line.630"></a>
+<span class="sourceLineNo">631</span>    //IMAQ_FUNC CircleReport* IMAQ_STDCALL imaqFindCircles(Image* dest, Image* source, float minRadius, float maxRadius, int* numCircles);<a name="line.631"></a>
+<span class="sourceLineNo">632</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqLabel2(Image* dest, Image* source, int connectivity8, int* particleCount);<a name="line.632"></a>
+<span class="sourceLineNo">633</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqMorphology(Image* dest, Image* source, MorphologyMethod method, const StructuringElement* structuringElement);<a name="line.633"></a>
+<span class="sourceLineNo">634</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqRejectBorder(Image* dest, Image* source, int connectivity8);<a name="line.634"></a>
+<span class="sourceLineNo">635</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqSegmentation(Image* dest, Image* source);<a name="line.635"></a>
+<span class="sourceLineNo">636</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqSeparation(Image* dest, Image* source, int erosions, const StructuringElement* structuringElement);<a name="line.636"></a>
+<span class="sourceLineNo">637</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqSimpleDistance(Image* dest, Image* source, const StructuringElement* structuringElement);<a name="line.637"></a>
+<span class="sourceLineNo">638</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqSizeFilter(Image* dest, Image* source, int connectivity8, int erosions, SizeType keepSize, const StructuringElement* structuringElement);<a name="line.638"></a>
+<span class="sourceLineNo">639</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqSkeleton(Image* dest, Image* source, SkeletonMethod method);<a name="line.639"></a>
+<span class="sourceLineNo">640</span>        <a name="line.640"></a>
+<span class="sourceLineNo">641</span>        <a name="line.641"></a>
+<span class="sourceLineNo">642</span>    /**<a name="line.642"></a>
+<span class="sourceLineNo">643</span>     * Convex hull operation<a name="line.643"></a>
+<span class="sourceLineNo">644</span>     */<a name="line.644"></a>
+<span class="sourceLineNo">645</span>    private static final BlockingFunction imaqConvexHullFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqConvexHull");<a name="line.645"></a>
+<span class="sourceLineNo">646</span>    static { imaqConvexHullFn.setTaskExecutor(taskExecutor); }<a name="line.646"></a>
+<span class="sourceLineNo">647</span>    <a name="line.647"></a>
+<span class="sourceLineNo">648</span>    public static void convexHull(Pointer dest, Pointer source, int connectivity8) throws NIVisionException {<a name="line.648"></a>
+<span class="sourceLineNo">649</span>        assertCleanStatus(imaqConvexHullFn.call3(dest.address().toUWord().toPrimitive(),<a name="line.649"></a>
+<span class="sourceLineNo">650</span>                                                source.address().toUWord().toPrimitive(),<a name="line.650"></a>
+<span class="sourceLineNo">651</span>                                                connectivity8));<a name="line.651"></a>
+<span class="sourceLineNo">652</span>    }<a name="line.652"></a>
+<span class="sourceLineNo">653</span>    <a name="line.653"></a>
+<span class="sourceLineNo">654</span>    /**<a name="line.654"></a>
+<span class="sourceLineNo">655</span>     * size filter function<a name="line.655"></a>
+<span class="sourceLineNo">656</span>     */<a name="line.656"></a>
+<span class="sourceLineNo">657</span>    private static final BlockingFunction imaqSizeFilterFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqSizeFilter");<a name="line.657"></a>
+<span class="sourceLineNo">658</span>    static { imaqSizeFilterFn.setTaskExecutor(taskExecutor); }<a name="line.658"></a>
+<span class="sourceLineNo">659</span>    <a name="line.659"></a>
+<span class="sourceLineNo">660</span>    public static void sizeFilter(Pointer dest, Pointer source, boolean connectivity8, int erosions, boolean keepLarger) throws NIVisionException {<a name="line.660"></a>
+<span class="sourceLineNo">661</span>        assertCleanStatus(imaqSizeFilterFn.call6(dest.address().toUWord().toPrimitive(),<a name="line.661"></a>
+<span class="sourceLineNo">662</span>                                                source.address().toUWord().toPrimitive(),<a name="line.662"></a>
+<span class="sourceLineNo">663</span>                                                connectivity8 ? 1 : 0, erosions, keepLarger ? 0 : 1, 0));<a name="line.663"></a>
+<span class="sourceLineNo">664</span>    }<a name="line.664"></a>
+<span class="sourceLineNo">665</span>    <a name="line.665"></a>
+<span class="sourceLineNo">666</span>    //============================================================================<a name="line.666"></a>
+<span class="sourceLineNo">667</span>    //  Logical functions<a name="line.667"></a>
+<span class="sourceLineNo">668</span>    //============================================================================<a name="line.668"></a>
+<span class="sourceLineNo">669</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqAnd(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.669"></a>
+<span class="sourceLineNo">670</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqAndConstant(Image* dest, const Image* source, PixelValue value);<a name="line.670"></a>
+<span class="sourceLineNo">671</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqCompare(Image* dest, const Image* source, const Image* compareImage, ComparisonFunction compare);<a name="line.671"></a>
+<span class="sourceLineNo">672</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqCompareConstant(Image* dest, const Image* source, PixelValue value, ComparisonFunction compare);<a name="line.672"></a>
+<span class="sourceLineNo">673</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqLogicalDifference(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.673"></a>
+<span class="sourceLineNo">674</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqLogicalDifferenceConstant(Image* dest, const Image* source, PixelValue value);<a name="line.674"></a>
+<span class="sourceLineNo">675</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqNand(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.675"></a>
+<span class="sourceLineNo">676</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqNandConstant(Image* dest, const Image* source, PixelValue value);<a name="line.676"></a>
+<span class="sourceLineNo">677</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqNor(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.677"></a>
+<span class="sourceLineNo">678</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqNorConstant(Image* dest, const Image* source, PixelValue value);<a name="line.678"></a>
+<span class="sourceLineNo">679</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOr(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.679"></a>
+<span class="sourceLineNo">680</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOrConstant(Image* dest, const Image* source, PixelValue value);<a name="line.680"></a>
+<span class="sourceLineNo">681</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqXnor(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.681"></a>
+<span class="sourceLineNo">682</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqXnorConstant(Image* dest, const Image* source, PixelValue value);<a name="line.682"></a>
+<span class="sourceLineNo">683</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqXor(Image* dest, const Image* sourceA, const Image* sourceB);<a name="line.683"></a>
+<span class="sourceLineNo">684</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqXorConstant(Image* dest, const Image* source, PixelValue value);<a name="line.684"></a>
+<span class="sourceLineNo">685</span><a name="line.685"></a>
+<span class="sourceLineNo">686</span>    //============================================================================<a name="line.686"></a>
+<span class="sourceLineNo">687</span>    //  Particle Analysis functions<a name="line.687"></a>
+<span class="sourceLineNo">688</span>    //============================================================================<a name="line.688"></a>
+<span class="sourceLineNo">689</span><a name="line.689"></a>
+<span class="sourceLineNo">690</span>    private static final BlockingFunction imaqCountParticlesFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqCountParticles");<a name="line.690"></a>
+<span class="sourceLineNo">691</span>    static { imaqCountParticlesFn.setTaskExecutor(taskExecutor); }<a name="line.691"></a>
+<span class="sourceLineNo">692</span><a name="line.692"></a>
+<span class="sourceLineNo">693</span>    /**<a name="line.693"></a>
+<span class="sourceLineNo">694</span>     * Counts the number of particles in a binary image.<a name="line.694"></a>
+<span class="sourceLineNo">695</span>     * @param image The image to count the particles in<a name="line.695"></a>
+<span class="sourceLineNo">696</span>     * @return The number of particles<a name="line.696"></a>
+<span class="sourceLineNo">697</span>     */<a name="line.697"></a>
+<span class="sourceLineNo">698</span>    public static int countParticles(Pointer image)  throws NIVisionException{<a name="line.698"></a>
+<span class="sourceLineNo">699</span>        IntByReference i = new IntByReference(0);<a name="line.699"></a>
+<span class="sourceLineNo">700</span>        int val;<a name="line.700"></a>
+<span class="sourceLineNo">701</span>        try {<a name="line.701"></a>
+<span class="sourceLineNo">702</span>            assertCleanStatus(imaqCountParticlesFn.call3(image, 1, i.getPointer()));<a name="line.702"></a>
+<span class="sourceLineNo">703</span>        } finally {<a name="line.703"></a>
+<span class="sourceLineNo">704</span>            val = i.getValue();<a name="line.704"></a>
+<span class="sourceLineNo">705</span>            i.free();<a name="line.705"></a>
+<span class="sourceLineNo">706</span>        }<a name="line.706"></a>
+<span class="sourceLineNo">707</span>        return val;<a name="line.707"></a>
+<span class="sourceLineNo">708</span>    }<a name="line.708"></a>
+<span class="sourceLineNo">709</span><a name="line.709"></a>
+<span class="sourceLineNo">710</span>    private static final BlockingFunction imaqMeasureParticleFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqMeasureParticle");<a name="line.710"></a>
+<span class="sourceLineNo">711</span>    static { imaqMeasureParticleFn.setTaskExecutor(taskExecutor); }<a name="line.711"></a>
+<span class="sourceLineNo">712</span><a name="line.712"></a>
+<span class="sourceLineNo">713</span>    /**<a name="line.713"></a>
+<span class="sourceLineNo">714</span>     * Returns a measurement associated with a particle<a name="line.714"></a>
+<span class="sourceLineNo">715</span>     * @param image The image containing the particle to get information about.<a name="line.715"></a>
+<span class="sourceLineNo">716</span>     * @param particleNum The number of the particle to get information about.<a name="line.716"></a>
+<span class="sourceLineNo">717</span>     * @param calibrated Specifies whether to return the measurement as a real-world value.<a name="line.717"></a>
+<span class="sourceLineNo">718</span>     * @param type The measurement to make on the particle.<a name="line.718"></a>
+<span class="sourceLineNo">719</span>     * @return The value of the requested measurement.<a name="line.719"></a>
+<span class="sourceLineNo">720</span>     */<a name="line.720"></a>
+<span class="sourceLineNo">721</span>    public static double MeasureParticle (Pointer image, int particleNum, boolean calibrated, MeasurementType type)  throws NIVisionException{<a name="line.721"></a>
+<span class="sourceLineNo">722</span>        Pointer l = new Pointer(8);<a name="line.722"></a>
+<span class="sourceLineNo">723</span>        double val;<a name="line.723"></a>
+<span class="sourceLineNo">724</span>        try {<a name="line.724"></a>
+<span class="sourceLineNo">725</span>            assertCleanStatus(imaqMeasureParticleFn.call5(image, particleNum, calibrated?1:0, type.value, l));<a name="line.725"></a>
+<span class="sourceLineNo">726</span>        } finally {<a name="line.726"></a>
+<span class="sourceLineNo">727</span>            val = l.getDouble(0);<a name="line.727"></a>
+<span class="sourceLineNo">728</span>            l.free();<a name="line.728"></a>
+<span class="sourceLineNo">729</span>        }<a name="line.729"></a>
+<span class="sourceLineNo">730</span>        return val;<a name="line.730"></a>
+<span class="sourceLineNo">731</span>    }<a name="line.731"></a>
+<span class="sourceLineNo">732</span><a name="line.732"></a>
+<span class="sourceLineNo">733</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqParticleFilter4(Image* dest, Image* source, const ParticleFilterCriteria2* criteria, int criteriaCount, const ParticleFilterOptions2* options, const ROI* roi, int* numParticles);<a name="line.733"></a>
+<span class="sourceLineNo">734</span><a name="line.734"></a>
+<span class="sourceLineNo">735</span>    private static final BlockingFunction imaqParticleFilter4Fn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqParticleFilter4");<a name="line.735"></a>
+<span class="sourceLineNo">736</span>    <a name="line.736"></a>
+<span class="sourceLineNo">737</span>    public static int particleFilter(Pointer dest, Pointer source, CriteriaCollection collection) throws NIVisionException {<a name="line.737"></a>
+<span class="sourceLineNo">738</span>        Pointer particleFilterOptions = new Pointer(16);<a name="line.738"></a>
+<span class="sourceLineNo">739</span>        particleFilterOptions.setInt(0, 0);<a name="line.739"></a>
+<span class="sourceLineNo">740</span>        particleFilterOptions.setInt(4, 0);<a name="line.740"></a>
+<span class="sourceLineNo">741</span>        particleFilterOptions.setInt(8, 0);<a name="line.741"></a>
+<span class="sourceLineNo">742</span>        particleFilterOptions.setInt(12, 1);<a name="line.742"></a>
+<span class="sourceLineNo">743</span>        IntByReference i = new IntByReference(0);<a name="line.743"></a>
+<span class="sourceLineNo">744</span>        Pointer criteriaArray = collection.getCriteriaArray();<a name="line.744"></a>
+<span class="sourceLineNo">745</span>        assertCleanStatus(imaqParticleFilter4Fn.call7(dest.address().toUWord().toPrimitive(),   // dest image<a name="line.745"></a>
+<span class="sourceLineNo">746</span>                                                    source.address().toUWord().toPrimitive(),   // source image<a name="line.746"></a>
+<span class="sourceLineNo">747</span>                                                    criteriaArray.address().toUWord().toPrimitive(),  // array of criteria<a name="line.747"></a>
+<span class="sourceLineNo">748</span>                                                    collection.getNumberOfCriteria(),           // number of criteria in the array<a name="line.748"></a>
+<span class="sourceLineNo">749</span>                                                    particleFilterOptions.address().toUWord().toPrimitive(),  // particle filter options<a name="line.749"></a>
+<span class="sourceLineNo">750</span>                                                    0,                                          // Region of interest<a name="line.750"></a>
+<span class="sourceLineNo">751</span>                                                    i.getPointer().address().toUWord().toPrimitive()));  // returned number of particles<a name="line.751"></a>
+<span class="sourceLineNo">752</span>        int numberOfParticles = i.getValue();<a name="line.752"></a>
+<span class="sourceLineNo">753</span>        i.free();<a name="line.753"></a>
+<span class="sourceLineNo">754</span>        criteriaArray.free();<a name="line.754"></a>
+<span class="sourceLineNo">755</span>        particleFilterOptions.free();<a name="line.755"></a>
+<span class="sourceLineNo">756</span>        return numberOfParticles;<a name="line.756"></a>
+<span class="sourceLineNo">757</span>    }<a name="line.757"></a>
+<span class="sourceLineNo">758</span><a name="line.758"></a>
+<span class="sourceLineNo">759</span>    //============================================================================<a name="line.759"></a>
+<span class="sourceLineNo">760</span>    //  Analytic Geometry functions<a name="line.760"></a>
+<span class="sourceLineNo">761</span>    //============================================================================<a name="line.761"></a>
+<span class="sourceLineNo">762</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqBuildCoordinateSystem(const Point* points, ReferenceMode mode, AxisOrientation orientation, CoordinateSystem* system);<a name="line.762"></a>
+<span class="sourceLineNo">763</span>    //IMAQ_FUNC BestCircle2*  IMAQ_STDCALL imaqFitCircle2(const PointFloat* points, int numPoints, const FitCircleOptions* options);<a name="line.763"></a>
+<span class="sourceLineNo">764</span>    //IMAQ_FUNC BestEllipse2* IMAQ_STDCALL imaqFitEllipse2(const PointFloat* points, int numPoints, const FitEllipseOptions* options);<a name="line.764"></a>
+<span class="sourceLineNo">765</span>    //IMAQ_FUNC BestLine*     IMAQ_STDCALL imaqFitLine(const PointFloat* points, int numPoints, const FitLineOptions* options);<a name="line.765"></a>
+<span class="sourceLineNo">766</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqGetAngle(PointFloat start1, PointFloat end1, PointFloat start2, PointFloat end2, float* angle);<a name="line.766"></a>
+<span class="sourceLineNo">767</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqGetBisectingLine(PointFloat start1, PointFloat end1, PointFloat start2, PointFloat end2, PointFloat* bisectStart, PointFloat* bisectEnd);<a name="line.767"></a>
+<span class="sourceLineNo">768</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqGetDistance(PointFloat point1, PointFloat point2, float* distance);<a name="line.768"></a>
+<span class="sourceLineNo">769</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqGetIntersection(PointFloat start1, PointFloat end1, PointFloat start2, PointFloat end2, PointFloat* intersection);<a name="line.769"></a>
+<span class="sourceLineNo">770</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqGetMidLine(PointFloat refLineStart, PointFloat refLineEnd, PointFloat point, PointFloat* midLineStart, PointFloat* midLineEnd);<a name="line.770"></a>
+<span class="sourceLineNo">771</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqGetPerpendicularLine(PointFloat refLineStart, PointFloat refLineEnd, PointFloat point, PointFloat* perpLineStart, PointFloat* perpLineEnd, double* distance);<a name="line.771"></a>
+<span class="sourceLineNo">772</span>    //IMAQ_FUNC SegmentInfo*  IMAQ_STDCALL imaqGetPointsOnContour(const Image* image, int* numSegments);<a name="line.772"></a>
+<span class="sourceLineNo">773</span>    //IMAQ_FUNC Point*        IMAQ_STDCALL imaqGetPointsOnLine(Point start, Point end, int* numPoints);<a name="line.773"></a>
+<span class="sourceLineNo">774</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqGetPolygonArea(const PointFloat* points, int numPoints, float* area);<a name="line.774"></a>
+<span class="sourceLineNo">775</span>    //IMAQ_FUNC float*        IMAQ_STDCALL imaqInterpolatePoints(const Image* image, const Point* points, int numPoints, InterpolationMethod method, int subpixel, int* interpCount);<a name="line.775"></a>
+<span class="sourceLineNo">776</span><a name="line.776"></a>
+<span class="sourceLineNo">777</span>    //============================================================================<a name="line.777"></a>
+<span class="sourceLineNo">778</span>    //  Border functions<a name="line.778"></a>
+<span class="sourceLineNo">779</span>    //============================================================================<a name="line.779"></a>
+<span class="sourceLineNo">780</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqFillBorder(Image* image, BorderMethod method);<a name="line.780"></a>
+<span class="sourceLineNo">781</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqGetBorderSize(const Image* image, int* borderSize);<a name="line.781"></a>
+<span class="sourceLineNo">782</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqSetBorderSize(Image* image, int size);<a name="line.782"></a>
+<span class="sourceLineNo">783</span><a name="line.783"></a>
+<span class="sourceLineNo">784</span>    //============================================================================<a name="line.784"></a>
+<span class="sourceLineNo">785</span>    //  Image Management functions<a name="line.785"></a>
+<span class="sourceLineNo">786</span>    //============================================================================<a name="line.786"></a>
+<span class="sourceLineNo">787</span>    protected static final BlockingFunction imaqCreateImageFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqCreateImage");<a name="line.787"></a>
+<span class="sourceLineNo">788</span>    static { imaqCreateImageFn.setTaskExecutor(taskExecutor); }<a name="line.788"></a>
+<span class="sourceLineNo">789</span><a name="line.789"></a>
+<span class="sourceLineNo">790</span>    /**<a name="line.790"></a>
+<span class="sourceLineNo">791</span>     * Allocates space for and creates a new imaq image<a name="line.791"></a>
+<span class="sourceLineNo">792</span>     * @param type the imaq encoding to use for the image<a name="line.792"></a>
+<span class="sourceLineNo">793</span>     * @param borderSize the size of border to use for the image<a name="line.793"></a>
+<span class="sourceLineNo">794</span>     * @return a newly allocated pointer to an imaqImage<a name="line.794"></a>
+<span class="sourceLineNo">795</span>     */<a name="line.795"></a>
+<span class="sourceLineNo">796</span>    public static Pointer imaqCreateImage(ImageType type, int borderSize) throws NIVisionException{<a name="line.796"></a>
+<span class="sourceLineNo">797</span>        int toReturn = imaqCreateImageFn.call2(type.value, borderSize);<a name="line.797"></a>
+<span class="sourceLineNo">798</span>        assertCleanStatus(toReturn);<a name="line.798"></a>
+<span class="sourceLineNo">799</span>        return new Pointer(toReturn, 0);<a name="line.799"></a>
+<span class="sourceLineNo">800</span>    }<a name="line.800"></a>
+<span class="sourceLineNo">801</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqArrayToImage(Image* image, const void* array, int numCols, int numRows);<a name="line.801"></a>
+<span class="sourceLineNo">802</span>    //IMAQ_FUNC void*  IMAQ_STDCALL imaqImageToArray(const Image* image, Rect rect, int* columns, int* rows);<a name="line.802"></a>
+<span class="sourceLineNo">803</span><a name="line.803"></a>
+<span class="sourceLineNo">804</span>    //============================================================================<a name="line.804"></a>
+<span class="sourceLineNo">805</span>    //  Color Processing functions<a name="line.805"></a>
+<span class="sourceLineNo">806</span>    //============================================================================<a name="line.806"></a>
+<span class="sourceLineNo">807</span><a name="line.807"></a>
+<span class="sourceLineNo">808</span>    private static final BlockingFunction imaqColorThresholdFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqColorThreshold");<a name="line.808"></a>
+<span class="sourceLineNo">809</span>    static { imaqColorThresholdFn.setTaskExecutor(taskExecutor); }<a name="line.809"></a>
+<span class="sourceLineNo">810</span><a name="line.810"></a>
+<span class="sourceLineNo">811</span>    /**<a name="line.811"></a>
+<span class="sourceLineNo">812</span>     * Convert the given image into a binary image true where the colors match the given thresholds<a name="line.812"></a>
+<span class="sourceLineNo">813</span>     * @param dest the 8 bit monocolor image to store the result in<a name="line.813"></a>
+<span class="sourceLineNo">814</span>     * @param source the color image source<a name="line.814"></a>
+<span class="sourceLineNo">815</span>     * @param mode The mode of color to use<a name="line.815"></a>
+<span class="sourceLineNo">816</span>     * @param plane1Range First color range<a name="line.816"></a>
+<span class="sourceLineNo">817</span>     * @param plane2Range Second color range<a name="line.817"></a>
+<span class="sourceLineNo">818</span>     * @param plane3Range Third color range<a name="line.818"></a>
+<span class="sourceLineNo">819</span>     */<a name="line.819"></a>
+<span class="sourceLineNo">820</span>    public static void colorThreshold(Pointer dest, Pointer source, ColorMode mode,<a name="line.820"></a>
+<span class="sourceLineNo">821</span>            Pointer plane1Range, Pointer plane2Range, Pointer plane3Range)  throws NIVisionException{<a name="line.821"></a>
+<span class="sourceLineNo">822</span>        int replaceValue = 1;<a name="line.822"></a>
+<span class="sourceLineNo">823</span>        assertCleanStatus(imaqColorThresholdFn.call7(dest.address().toUWord().toPrimitive(),<a name="line.823"></a>
+<span class="sourceLineNo">824</span>                source.address().toUWord().toPrimitive(),<a name="line.824"></a>
+<span class="sourceLineNo">825</span>                replaceValue, mode.value,<a name="line.825"></a>
+<span class="sourceLineNo">826</span>                plane1Range.address().toUWord().toPrimitive(),<a name="line.826"></a>
+<span class="sourceLineNo">827</span>                plane2Range.address().toUWord().toPrimitive(),<a name="line.827"></a>
+<span class="sourceLineNo">828</span>                plane3Range.address().toUWord().toPrimitive()));<a name="line.828"></a>
+<span class="sourceLineNo">829</span>    }<a name="line.829"></a>
+<span class="sourceLineNo">830</span><a name="line.830"></a>
+<span class="sourceLineNo">831</span>    private static final BlockingFunction imaqColorEqualizeFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqColorEqualize");<a name="line.831"></a>
+<span class="sourceLineNo">832</span>    static { imaqColorEqualizeFn.setTaskExecutor(taskExecutor); }<a name="line.832"></a>
+<span class="sourceLineNo">833</span><a name="line.833"></a>
+<span class="sourceLineNo">834</span>    /**<a name="line.834"></a>
+<span class="sourceLineNo">835</span>     * Calculates the histogram of each plane of a color image and redistributes<a name="line.835"></a>
+<span class="sourceLineNo">836</span>     * pixel values across the desired range while maintaining pixel value<a name="line.836"></a>
+<span class="sourceLineNo">837</span>     * groupings.<a name="line.837"></a>
+<span class="sourceLineNo">838</span>     * @param destination The destination image.<a name="line.838"></a>
+<span class="sourceLineNo">839</span>     * @param source The image to equalize.<a name="line.839"></a>
+<span class="sourceLineNo">840</span>     * @param all Set this parameter to TRUE to equalize all three planes of the<a name="line.840"></a>
+<span class="sourceLineNo">841</span>     * image. Set this parameter to FALSE to equalize only the luminance plane.<a name="line.841"></a>
+<span class="sourceLineNo">842</span>     */<a name="line.842"></a>
+<span class="sourceLineNo">843</span>    public static void colorEqualize(Pointer destination, Pointer source, boolean all)  throws NIVisionException{<a name="line.843"></a>
+<span class="sourceLineNo">844</span>        assertCleanStatus(imaqColorEqualizeFn.call3(destination, source,all?1:0));<a name="line.844"></a>
+<span class="sourceLineNo">845</span>    }<a name="line.845"></a>
+<span class="sourceLineNo">846</span><a name="line.846"></a>
+<span class="sourceLineNo">847</span>    //IMAQ_FUNC Color2                IMAQ_STDCALL imaqChangeColorSpace2(const Color2* sourceColor, ColorMode sourceSpace, ColorMode destSpace, double offset, const CIEXYZValue* whiteReference);<a name="line.847"></a>
+<span class="sourceLineNo">848</span>    //IMAQ_FUNC int                   IMAQ_STDCALL imaqColorBCGTransform(Image* dest, const Image* source, const BCGOptions* redOptions, const BCGOptions* greenOptions, const BCGOptions* blueOptions, const Image* mask);<a name="line.848"></a>
+<span class="sourceLineNo">849</span>    //IMAQ_FUNC ColorHistogramReport* IMAQ_STDCALL imaqColorHistogram2(Image* image, int numClasses, ColorMode mode, const CIEXYZValue* whiteReference, Image* mask);<a name="line.849"></a>
+<span class="sourceLineNo">850</span>    //IMAQ_FUNC int                   IMAQ_STDCALL imaqColorLookup(Image* dest, const Image* source, ColorMode mode, const Image* mask, const short* plane1, const short* plane2, const short* plane3);<a name="line.850"></a>
+<span class="sourceLineNo">851</span><a name="line.851"></a>
+<span class="sourceLineNo">852</span>    //============================================================================<a name="line.852"></a>
+<span class="sourceLineNo">853</span>    //  Transform functions<a name="line.853"></a>
+<span class="sourceLineNo">854</span>    //============================================================================<a name="line.854"></a>
+<span class="sourceLineNo">855</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqBCGTransform(Image* dest, const Image* source, const BCGOptions* options, const Image* mask);<a name="line.855"></a>
+<span class="sourceLineNo">856</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqEqualize(Image* dest, const Image* source, float min, float max, const Image* mask);<a name="line.856"></a>
+<span class="sourceLineNo">857</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqInverse(Image* dest, const Image* source, const Image* mask);<a name="line.857"></a>
+<span class="sourceLineNo">858</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqLookup(Image* dest, const Image* source, const short* table, const Image* mask);<a name="line.858"></a>
+<span class="sourceLineNo">859</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqMathTransform(Image* dest, const Image* source, MathTransformMethod method, float rangeMin, float rangeMax, float power, const Image* mask);<a name="line.859"></a>
+<span class="sourceLineNo">860</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqWatershedTransform(Image* dest, const Image* source, int connectivity8, int* zoneCount);<a name="line.860"></a>
+<span class="sourceLineNo">861</span><a name="line.861"></a>
+<span class="sourceLineNo">862</span><a name="line.862"></a>
+<span class="sourceLineNo">863</span>    //============================================================================<a name="line.863"></a>
+<span class="sourceLineNo">864</span>    //  Utilities functions<a name="line.864"></a>
+<span class="sourceLineNo">865</span>    //============================================================================<a name="line.865"></a>
+<span class="sourceLineNo">866</span>    //IMAQ_FUNC const float* IMAQ_STDCALL imaqGetKernel(KernelFamily family, int size, int number);<a name="line.866"></a>
+<span class="sourceLineNo">867</span>    //IMAQ_FUNC Annulus      IMAQ_STDCALL imaqMakeAnnulus(Point center, int innerRadius, int outerRadius, double startAngle, double endAngle);<a name="line.867"></a>
+<span class="sourceLineNo">868</span>    //IMAQ_FUNC Point        IMAQ_STDCALL imaqMakePoint(int xCoordinate, int yCoordinate);<a name="line.868"></a>
+<span class="sourceLineNo">869</span>    //IMAQ_FUNC PointFloat   IMAQ_STDCALL imaqMakePointFloat(float xCoordinate, float yCoordinate);<a name="line.869"></a>
+<span class="sourceLineNo">870</span>    //IMAQ_FUNC Rect         IMAQ_STDCALL imaqMakeRect(int top, int left, int height, int width);<a name="line.870"></a>
+<span class="sourceLineNo">871</span>    //IMAQ_FUNC Rect         IMAQ_STDCALL imaqMakeRectFromRotatedRect(RotatedRect rotatedRect);<a name="line.871"></a>
+<span class="sourceLineNo">872</span>    //IMAQ_FUNC RotatedRect  IMAQ_STDCALL imaqMakeRotatedRect(int top, int left, int height, int width, double angle);<a name="line.872"></a>
+<span class="sourceLineNo">873</span>    //IMAQ_FUNC RotatedRect  IMAQ_STDCALL imaqMakeRotatedRectFromRect(Rect rect);<a name="line.873"></a>
+<span class="sourceLineNo">874</span>    //IMAQ_FUNC int          IMAQ_STDCALL imaqMulticoreOptions(MulticoreOperation operation, unsigned int* customNumCores);<a name="line.874"></a>
+<span class="sourceLineNo">875</span><a name="line.875"></a>
+<span class="sourceLineNo">876</span>    //============================================================================<a name="line.876"></a>
+<span class="sourceLineNo">877</span>    //  Image Manipulation functions<a name="line.877"></a>
+<span class="sourceLineNo">878</span>    //============================================================================<a name="line.878"></a>
+<span class="sourceLineNo">879</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqCast(Image* dest, const Image* source, ImageType type, const float* lookup, int shift);<a name="line.879"></a>
+<span class="sourceLineNo">880</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqCopyRect(Image* dest, const Image* source, Rect rect, Point destLoc);<a name="line.880"></a>
+<span class="sourceLineNo">881</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqDuplicate(Image* dest, const Image* source);<a name="line.881"></a>
+<span class="sourceLineNo">882</span>    //IMAQ_FUNC void* IMAQ_STDCALL imaqFlatten(const Image* image, FlattenType type, CompressionType compression, int quality, unsigned int* size);<a name="line.882"></a>
+<span class="sourceLineNo">883</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqFlip(Image* dest, const Image* source, FlipAxis axis);<a name="line.883"></a>
+<span class="sourceLineNo">884</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqMask(Image* dest, const Image* source, const Image* mask);<a name="line.884"></a>
+<span class="sourceLineNo">885</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqResample(Image* dest, const Image* source, int newWidth, int newHeight, InterpolationMethod method, Rect rect);<a name="line.885"></a>
+<span class="sourceLineNo">886</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqRotate2(Image* dest, const Image* source, float angle, PixelValue fill, InterpolationMethod method, int maintainSize);<a name="line.886"></a>
+<span class="sourceLineNo">887</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqScale(Image* dest, const Image* source, int xScale, int yScale, ScalingMode scaleMode, Rect rect);<a name="line.887"></a>
+<span class="sourceLineNo">888</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqShift(Image* dest, const Image* source, int shiftX, int shiftY, PixelValue fill);<a name="line.888"></a>
+<span class="sourceLineNo">889</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqTranspose(Image* dest, const Image* source);<a name="line.889"></a>
+<span class="sourceLineNo">890</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqUnflatten(Image* image, const void* data, unsigned int size);<a name="line.890"></a>
+<span class="sourceLineNo">891</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqUnwrapImage(Image* dest, const Image* source, Annulus annulus, RectOrientation orientation, InterpolationMethod method);<a name="line.891"></a>
+<span class="sourceLineNo">892</span>    //IMAQ_FUNC int   IMAQ_STDCALL imaqView3D(Image* dest, Image* source, const View3DOptions* options);<a name="line.892"></a>
+<span class="sourceLineNo">893</span><a name="line.893"></a>
+<span class="sourceLineNo">894</span>    //============================================================================<a name="line.894"></a>
+<span class="sourceLineNo">895</span>    //  Pattern Matching functions<a name="line.895"></a>
+<span class="sourceLineNo">896</span>    //============================================================================<a name="line.896"></a>
+<span class="sourceLineNo">897</span><a name="line.897"></a>
+<span class="sourceLineNo">898</span>    private static final BlockingFunction imaqDetectEllipsesFn =<a name="line.898"></a>
+<span class="sourceLineNo">899</span>            NativeLibrary.getDefaultInstance().getBlockingFunction("imaqDetectEllipses");<a name="line.899"></a>
+<span class="sourceLineNo">900</span>    static { imaqDetectEllipsesFn.setTaskExecutor(taskExecutor); }<a name="line.900"></a>
+<span class="sourceLineNo">901</span>    private static Pointer numberOfEllipsesDetected = new Pointer(4);<a name="line.901"></a>
+<span class="sourceLineNo">902</span><a name="line.902"></a>
+<span class="sourceLineNo">903</span><a name="line.903"></a>
+<span class="sourceLineNo">904</span>    public static EllipseMatch[] detectEllipses(MonoImage image, EllipseDescriptor ellipseDescriptor,<a name="line.904"></a>
+<span class="sourceLineNo">905</span>            CurveOptions curveOptions, ShapeDetectionOptions shapeDetectionOptions,<a name="line.905"></a>
+<span class="sourceLineNo">906</span>            RegionOfInterest roi) throws NIVisionException {<a name="line.906"></a>
+<span class="sourceLineNo">907</span><a name="line.907"></a>
+<span class="sourceLineNo">908</span>        int curveOptionsPointer = 0;<a name="line.908"></a>
+<span class="sourceLineNo">909</span>        if (curveOptions != null)<a name="line.909"></a>
+<span class="sourceLineNo">910</span>            curveOptionsPointer = curveOptions.getPointer().address().toUWord().toPrimitive();<a name="line.910"></a>
+<span class="sourceLineNo">911</span>        int shapeDetectionOptionsPointer = 0;<a name="line.911"></a>
+<span class="sourceLineNo">912</span>        if (shapeDetectionOptions != null)<a name="line.912"></a>
+<span class="sourceLineNo">913</span>            shapeDetectionOptionsPointer = shapeDetectionOptions.getPointer().address().toUWord().toPrimitive();<a name="line.913"></a>
+<span class="sourceLineNo">914</span>        int roiPointer = 0;<a name="line.914"></a>
+<span class="sourceLineNo">915</span>        if (roi != null)<a name="line.915"></a>
+<span class="sourceLineNo">916</span>            roiPointer = roi.getPointer().address().toUWord().toPrimitive();<a name="line.916"></a>
+<span class="sourceLineNo">917</span><a name="line.917"></a>
+<span class="sourceLineNo">918</span>        int returnedAddress =<a name="line.918"></a>
+<span class="sourceLineNo">919</span>                imaqDetectEllipsesFn.call6(<a name="line.919"></a>
+<span class="sourceLineNo">920</span>                image.image.address().toUWord().toPrimitive(),<a name="line.920"></a>
+<span class="sourceLineNo">921</span>                ellipseDescriptor.getPointer().address().toUWord().toPrimitive(),<a name="line.921"></a>
+<span class="sourceLineNo">922</span>                curveOptionsPointer, shapeDetectionOptionsPointer,<a name="line.922"></a>
+<span class="sourceLineNo">923</span>                roiPointer,<a name="line.923"></a>
+<span class="sourceLineNo">924</span>                numberOfEllipsesDetected.address().toUWord().toPrimitive());<a name="line.924"></a>
+<span class="sourceLineNo">925</span><a name="line.925"></a>
+<span class="sourceLineNo">926</span>        try {<a name="line.926"></a>
+<span class="sourceLineNo">927</span>            assertCleanStatus(returnedAddress);<a name="line.927"></a>
+<span class="sourceLineNo">928</span>        } catch (NIVisionException ex) {<a name="line.928"></a>
+<span class="sourceLineNo">929</span>            if (!ex.getMessage().equals("No error."))<a name="line.929"></a>
+<span class="sourceLineNo">930</span>                throw ex;<a name="line.930"></a>
+<span class="sourceLineNo">931</span>        }<a name="line.931"></a>
+<span class="sourceLineNo">932</span>        return null;<a name="line.932"></a>
+<span class="sourceLineNo">933</span>//        EllipseMatch[] matches = EllipseMatch.getMatchesFromMemory(returnedAddress, numberOfEllipsesDetected.getInt(0));<a name="line.933"></a>
+<span class="sourceLineNo">934</span>//        NIVision.dispose(new Pointer(returnedAddress,0));<a name="line.934"></a>
+<span class="sourceLineNo">935</span>//        return matches;<a name="line.935"></a>
+<span class="sourceLineNo">936</span>    }<a name="line.936"></a>
+<span class="sourceLineNo">937</span>    //IMAQ_FUNC CircleMatch*              IMAQ_STDCALL imaqDetectCircles(const Image* image, const CircleDescriptor* circleDescriptor, const CurveOptions* curveOptions, const ShapeDetectionOptions* shapeDetectionOptions, const ROI* roi, int* numMatchesReturned);<a name="line.937"></a>
+<span class="sourceLineNo">938</span>    //IMAQ_FUNC LineMatch*                IMAQ_STDCALL imaqDetectLines(const Image* image, const LineDescriptor* lineDescriptor, const CurveOptions* curveOptions, const ShapeDetectionOptions* shapeDetectionOptions, const ROI* roi, int* numMatchesReturned);<a name="line.938"></a>
+<span class="sourceLineNo">939</span>    //IMAQ_FUNC RectangleMatch*           IMAQ_STDCALL imaqDetectRectangles(const Image* image, const RectangleDescriptor* rectangleDescriptor, const CurveOptions* curveOptions, const ShapeDetectionOptions* shapeDetectionOptions, const ROI* roi, int* numMatchesReturned);<a name="line.939"></a>
+<span class="sourceLineNo">940</span>    //IMAQ_FUNC FeatureData*              IMAQ_STDCALL imaqGetGeometricFeaturesFromCurves(const Curve* curves, unsigned int numCurves, const FeatureType* featureTypes, unsigned int numFeatureTypes, unsigned int* numFeatures);<a name="line.940"></a>
+<span class="sourceLineNo">941</span>    //IMAQ_FUNC FeatureData*              IMAQ_STDCALL imaqGetGeometricTemplateFeatureInfo(const Image* pattern, unsigned int* numFeatures);<a name="line.941"></a>
+<span class="sourceLineNo">942</span>    //IMAQ_FUNC int                       IMAQ_STDCALL imaqLearnColorPattern(Image* image, const LearnColorPatternOptions* options);<a name="line.942"></a>
+<span class="sourceLineNo">943</span>    //IMAQ_FUNC int                       IMAQ_STDCALL imaqLearnGeometricPattern(Image* image, PointFloat originOffset, const CurveOptions* curveOptions, const LearnGeometricPatternAdvancedOptions* advancedLearnOptions, const Image* mask);<a name="line.943"></a>
+<span class="sourceLineNo">944</span>    //IMAQ_FUNC MultipleGeometricPattern* IMAQ_STDCALL imaqLearnMultipleGeometricPatterns(const Image** patterns, unsigned int numberOfPatterns, const String255* labels);<a name="line.944"></a>
+<span class="sourceLineNo">945</span>    //IMAQ_FUNC int                       IMAQ_STDCALL imaqLearnPattern3(Image* image, LearningMode learningMode, LearnPatternAdvancedOptions* advancedOptions, const Image* mask);<a name="line.945"></a>
+<span class="sourceLineNo">946</span>    //IMAQ_FUNC PatternMatch*             IMAQ_STDCALL imaqMatchColorPattern(const Image* image, Image* pattern, const MatchColorPatternOptions* options, Rect searchRect, int* numMatches);<a name="line.946"></a>
+<span class="sourceLineNo">947</span>    //IMAQ_FUNC GeometricPatternMatch2*   IMAQ_STDCALL imaqMatchGeometricPattern2(const Image* image, const Image* pattern, const CurveOptions* curveOptions, const MatchGeometricPatternOptions* matchOptions, const MatchGeometricPatternAdvancedOptions2* advancedMatchOptions, const ROI* roi, int* numMatches);<a name="line.947"></a>
+<span class="sourceLineNo">948</span>    //IMAQ_FUNC GeometricPatternMatch2*   IMAQ_STDCALL imaqMatchMultipleGeometricPatterns(const Image* image, const MultipleGeometricPattern* multiplePattern, const ROI* roi, int* numMatches);<a name="line.948"></a>
+<span class="sourceLineNo">949</span>    //IMAQ_FUNC PatternMatch*             IMAQ_STDCALL imaqMatchPattern2(const Image* image, const Image* pattern, const MatchPatternOptions* options, const MatchPatternOptions* advancedOptions, Rect searchRect, int* numMatches);<a name="line.949"></a>
+<span class="sourceLineNo">950</span>    //IMAQ_FUNC MultipleGeometricPattern* IMAQ_STDCALL imaqReadMultipleGeometricPatternFile(const char* fileName, String255 description);<a name="line.950"></a>
+<span class="sourceLineNo">951</span>    //IMAQ_FUNC PatternMatch*             IMAQ_STDCALL imaqRefineMatches(const Image* image, const Image* pattern, const PatternMatch* candidatesIn, int numCandidatesIn, MatchPatternOptions* options, MatchPatternAdvancedOptions* advancedOptions, int* numCandidatesOut);<a name="line.951"></a>
+<span class="sourceLineNo">952</span>    //IMAQ_FUNC int                       IMAQ_STDCALL imaqSetMultipleGeometricPatternsOptions(MultipleGeometricPattern* multiplePattern, const char* label, const CurveOptions* curveOptions, const MatchGeometricPatternOptions* matchOptions, const MatchGeometricPatternAdvancedOptions2* advancedMatchOptions);<a name="line.952"></a>
+<span class="sourceLineNo">953</span>    //IMAQ_FUNC int                       IMAQ_STDCALL imaqWriteMultipleGeometricPatternFile(const MultipleGeometricPattern* multiplePattern, const char* fileName, const char* description);<a name="line.953"></a>
+<span class="sourceLineNo">954</span><a name="line.954"></a>
+<span class="sourceLineNo">955</span>    //============================================================================<a name="line.955"></a>
+<span class="sourceLineNo">956</span>    //  Calibration functions<a name="line.956"></a>
+<span class="sourceLineNo">957</span>    //============================================================================<a name="line.957"></a>
+<span class="sourceLineNo">958</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqCopyCalibrationInfo2(Image* dest, Image* source, Point offset);<a name="line.958"></a>
+<span class="sourceLineNo">959</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqCorrectCalibratedImage(Image* dest, const Image* source, PixelValue fill, InterpolationMethod method, const ROI* roi);<a name="line.959"></a>
+<span class="sourceLineNo">960</span>    //IMAQ_FUNC CalibrationInfo* IMAQ_STDCALL imaqGetCalibrationInfo2(const Image* image);<a name="line.960"></a>
+<span class="sourceLineNo">961</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqLearnCalibrationGrid(Image* image, const ROI* roi, const LearnCalibrationOptions* options, const GridDescriptor* grid, const CoordinateSystem* system, const RangeFloat* range, float* quality);<a name="line.961"></a>
+<span class="sourceLineNo">962</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqLearnCalibrationPoints(Image* image, const CalibrationPoints* points, const ROI* roi, const LearnCalibrationOptions* options, const GridDescriptor* grid, const CoordinateSystem* system, float* quality);<a name="line.962"></a>
+<span class="sourceLineNo">963</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqSetCoordinateSystem(Image* image, const CoordinateSystem* system);<a name="line.963"></a>
+<span class="sourceLineNo">964</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqSetSimpleCalibration(Image* image, ScalingMethod method, int learnTable, const GridDescriptor* grid, const CoordinateSystem* system);<a name="line.964"></a>
+<span class="sourceLineNo">965</span>    //IMAQ_FUNC TransformReport* IMAQ_STDCALL imaqTransformPixelToRealWorld(const Image* image, const PointFloat* pixelCoordinates, int numCoordinates);<a name="line.965"></a>
+<span class="sourceLineNo">966</span>    //IMAQ_FUNC TransformReport* IMAQ_STDCALL imaqTransformRealWorldToPixel(const Image* image, const PointFloat* realWorldCoordinates, int numCoordinates);<a name="line.966"></a>
+<span class="sourceLineNo">967</span><a name="line.967"></a>
+<span class="sourceLineNo">968</span>    //============================================================================<a name="line.968"></a>
+<span class="sourceLineNo">969</span>    //  Overlay functions<a name="line.969"></a>
+<span class="sourceLineNo">970</span>    //============================================================================<a name="line.970"></a>
+<span class="sourceLineNo">971</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqClearOverlay(Image* image, const char* group);<a name="line.971"></a>
+<span class="sourceLineNo">972</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqCopyOverlay(Image* dest, const Image* source, const char* group);<a name="line.972"></a>
+<span class="sourceLineNo">973</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqGetOverlayProperties(Image* image, const char* group, TransformBehaviors* transformBehaviors);<a name="line.973"></a>
+<span class="sourceLineNo">974</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqMergeOverlay(Image* dest, const Image* source, const RGBValue* palette, unsigned int numColors, const char* group);<a name="line.974"></a>
+<span class="sourceLineNo">975</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOverlayArc(Image* image, const ArcInfo* arc, const RGBValue* color, DrawMode drawMode, const char* group);<a name="line.975"></a>
+<span class="sourceLineNo">976</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOverlayBitmap(Image* image, Point destLoc, const RGBValue* bitmap, unsigned int numCols, unsigned int numRows, const char* group);<a name="line.976"></a>
+<span class="sourceLineNo">977</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOverlayClosedContour(Image* image, const Point* points, int numPoints, const RGBValue* color, DrawMode drawMode, const char* group);<a name="line.977"></a>
+<span class="sourceLineNo">978</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOverlayLine(Image* image, Point start, Point end, const RGBValue* color, const char* group);<a name="line.978"></a>
+<span class="sourceLineNo">979</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOverlayMetafile(Image* image, const void* metafile, Rect rect, const char* group);<a name="line.979"></a>
+<span class="sourceLineNo">980</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOverlayOpenContour(Image* image, const Point* points, int numPoints, const RGBValue* color, const char* group);<a name="line.980"></a>
+<span class="sourceLineNo">981</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOverlayOval(Image* image, Rect boundingBox, const RGBValue* color, DrawMode drawMode, char* group);<a name="line.981"></a>
+<span class="sourceLineNo">982</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOverlayPoints(Image* image, const Point* points, int numPoints, const RGBValue* colors, int numColors, PointSymbol symbol, const UserPointSymbol* userSymbol, const char* group);<a name="line.982"></a>
+<span class="sourceLineNo">983</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOverlayRect(Image* image, Rect rect, const RGBValue* color, DrawMode drawMode, const char* group);<a name="line.983"></a>
+<span class="sourceLineNo">984</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOverlayROI(Image* image, const ROI* roi, PointSymbol symbol, const UserPointSymbol* userSymbol, const char* group);<a name="line.984"></a>
+<span class="sourceLineNo">985</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqOverlayText(Image* image, Point origin, const char* text, const RGBValue* color, const OverlayTextOptions* options, const char* group);<a name="line.985"></a>
+<span class="sourceLineNo">986</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqSetOverlayProperties(Image* image, const char* group, TransformBehaviors* transformBehaviors);<a name="line.986"></a>
+<span class="sourceLineNo">987</span><a name="line.987"></a>
+<span class="sourceLineNo">988</span>    //============================================================================<a name="line.988"></a>
+<span class="sourceLineNo">989</span>    //  Color Matching functions<a name="line.989"></a>
+<span class="sourceLineNo">990</span>    //============================================================================<a name="line.990"></a>
+<span class="sourceLineNo">991</span>    //IMAQ_FUNC ColorInformation* IMAQ_STDCALL imaqLearnColor(const Image* image, const ROI* roi, ColorSensitivity sensitivity, int saturation);<a name="line.991"></a>
+<span class="sourceLineNo">992</span>    //IMAQ_FUNC int*              IMAQ_STDCALL imaqMatchColor(const Image* image, const ColorInformation* info, const ROI* roi, int* numScores);<a name="line.992"></a>
+<span class="sourceLineNo">993</span><a name="line.993"></a>
+<span class="sourceLineNo">994</span>    //============================================================================<a name="line.994"></a>
+<span class="sourceLineNo">995</span>    //  Meter functions<a name="line.995"></a>
+<span class="sourceLineNo">996</span>    //============================================================================<a name="line.996"></a>
+<span class="sourceLineNo">997</span>    //IMAQ_FUNC MeterArc* IMAQ_STDCALL imaqGetMeterArc(int lightNeedle, MeterArcMode mode, const ROI* roi, PointFloat base, PointFloat start, PointFloat end);<a name="line.997"></a>
+<span class="sourceLineNo">998</span>    //IMAQ_FUNC int       IMAQ_STDCALL imaqReadMeter(const Image* image, const MeterArc* arcInfo, double* percentage, PointFloat* endOfNeedle);<a name="line.998"></a>
+<span class="sourceLineNo">999</span><a name="line.999"></a>
+<span class="sourceLineNo">1000</span>    //============================================================================<a name="line.1000"></a>
+<span class="sourceLineNo">1001</span>    //  Barcode I/O functions<a name="line.1001"></a>
+<span class="sourceLineNo">1002</span>    //============================================================================<a name="line.1002"></a>
+<span class="sourceLineNo">1003</span>    //IMAQ_FUNC int               IMAQ_STDCALL imaqGradeDataMatrixBarcodeAIM(const Image* image, AIMGradeReport* report);<a name="line.1003"></a>
+<span class="sourceLineNo">1004</span>    //IMAQ_FUNC BarcodeInfo*      IMAQ_STDCALL imaqReadBarcode(const Image* image, BarcodeType type, const ROI* roi, int validate);<a name="line.1004"></a>
+<span class="sourceLineNo">1005</span>    //IMAQ_FUNC DataMatrixReport* IMAQ_STDCALL imaqReadDataMatrixBarcode2(Image* image, const ROI* roi, DataMatrixGradingMode prepareForGrading, const DataMatrixDescriptionOptions* descriptionOptions, const DataMatrixSizeOptions* sizeOptions, const DataMatrixSearchOptions* searchOptions);<a name="line.1005"></a>
+<span class="sourceLineNo">1006</span>    //IMAQ_FUNC Barcode2DInfo*    IMAQ_STDCALL imaqReadPDF417Barcode(const Image* image, const ROI* roi, Barcode2DSearchMode searchMode, unsigned int* numBarcodes);<a name="line.1006"></a>
+<span class="sourceLineNo">1007</span>    //IMAQ_FUNC QRCodeReport*     IMAQ_STDCALL imaqReadQRCode(Image* image, const ROI* roi, QRGradingMode reserved, const QRCodeDescriptionOptions* descriptionOptions, const QRCodeSizeOptions* sizeOptions, const QRCodeSearchOptions* searchOptions);<a name="line.1007"></a>
+<span class="sourceLineNo">1008</span><a name="line.1008"></a>
+<span class="sourceLineNo">1009</span>    //============================================================================<a name="line.1009"></a>
+<span class="sourceLineNo">1010</span>    //  Shape Matching functions<a name="line.1010"></a>
+<span class="sourceLineNo">1011</span>    //============================================================================<a name="line.1011"></a>
+<span class="sourceLineNo">1012</span>    //IMAQ_FUNC ShapeReport* IMAQ_STDCALL imaqMatchShape(Image* dest, Image* source, const Image* templateImage, int scaleInvariant, int connectivity8, double tolerance, int* numMatches);<a name="line.1012"></a>
+<span class="sourceLineNo">1013</span><a name="line.1013"></a>
+<span class="sourceLineNo">1014</span>    //============================================================================<a name="line.1014"></a>
+<span class="sourceLineNo">1015</span>    //  Contours functions<a name="line.1015"></a>
+<span class="sourceLineNo">1016</span>    //============================================================================<a name="line.1016"></a>
+<span class="sourceLineNo">1017</span>    //IMAQ_FUNC ContourID     IMAQ_STDCALL imaqAddAnnulusContour(ROI* roi, Annulus annulus);<a name="line.1017"></a>
+<span class="sourceLineNo">1018</span>    //IMAQ_FUNC ContourID     IMAQ_STDCALL imaqAddClosedContour(ROI* roi, const Point* points, int numPoints);<a name="line.1018"></a>
+<span class="sourceLineNo">1019</span>    //IMAQ_FUNC ContourID     IMAQ_STDCALL imaqAddLineContour(ROI* roi, Point start, Point end);<a name="line.1019"></a>
+<span class="sourceLineNo">1020</span>    //IMAQ_FUNC ContourID     IMAQ_STDCALL imaqAddOpenContour(ROI* roi, const Point* points, int numPoints);<a name="line.1020"></a>
+<span class="sourceLineNo">1021</span>    //IMAQ_FUNC ContourID     IMAQ_STDCALL imaqAddOvalContour(ROI* roi, Rect boundingBox);<a name="line.1021"></a>
+<span class="sourceLineNo">1022</span>    //IMAQ_FUNC ContourID     IMAQ_STDCALL imaqAddPointContour(ROI* roi, Point point);<a name="line.1022"></a>
+<span class="sourceLineNo">1023</span>    //IMAQ_FUNC ContourID     IMAQ_STDCALL imaqAddRectContour(ROI* roi, Rect rect);<a name="line.1023"></a>
+<span class="sourceLineNo">1024</span>    //IMAQ_FUNC ContourID     IMAQ_STDCALL imaqAddRotatedRectContour2(ROI* roi, RotatedRect rect);<a name="line.1024"></a>
+<span class="sourceLineNo">1025</span>    //IMAQ_FUNC ContourID     IMAQ_STDCALL imaqCopyContour(ROI* destRoi, const ROI* sourceRoi, ContourID id);<a name="line.1025"></a>
+<span class="sourceLineNo">1026</span>    //IMAQ_FUNC ContourID     IMAQ_STDCALL imaqGetContour(const ROI* roi, unsigned int index);<a name="line.1026"></a>
+<span class="sourceLineNo">1027</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqGetContourColor(const ROI* roi, ContourID id, RGBValue* contourColor);<a name="line.1027"></a>
+<span class="sourceLineNo">1028</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqGetContourCount(const ROI* roi);<a name="line.1028"></a>
+<span class="sourceLineNo">1029</span>    //IMAQ_FUNC ContourInfo2* IMAQ_STDCALL imaqGetContourInfo2(const ROI* roi, ContourID id);<a name="line.1029"></a>
+<span class="sourceLineNo">1030</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqMoveContour(ROI* roi, ContourID id, int deltaX, int deltaY);<a name="line.1030"></a>
+<span class="sourceLineNo">1031</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqRemoveContour(ROI* roi, ContourID id);<a name="line.1031"></a>
+<span class="sourceLineNo">1032</span>    //IMAQ_FUNC int           IMAQ_STDCALL imaqSetContourColor(ROI* roi, ContourID id, const RGBValue* color);<a name="line.1032"></a>
+<span class="sourceLineNo">1033</span><a name="line.1033"></a>
+<span class="sourceLineNo">1034</span>    //============================================================================<a name="line.1034"></a>
+<span class="sourceLineNo">1035</span>    //  Regions of Interest functions<a name="line.1035"></a>
+<span class="sourceLineNo">1036</span>    //============================================================================<a name="line.1036"></a>
+<span class="sourceLineNo">1037</span>    //IMAQ_FUNC int  IMAQ_STDCALL imaqConstructROI2(const Image* image, ROI* roi, Tool initialTool, const ToolWindowOptions* tools, const ConstructROIOptions2* options, int* okay);<a name="line.1037"></a>
+<span class="sourceLineNo">1038</span>    //IMAQ_FUNC ROI* IMAQ_STDCALL imaqCreateROI();<a name="line.1038"></a>
+<span class="sourceLineNo">1039</span>    //IMAQ_FUNC int  IMAQ_STDCALL imaqGetROIBoundingBox(const ROI* roi, Rect* boundingBox);<a name="line.1039"></a>
+<span class="sourceLineNo">1040</span>    //IMAQ_FUNC int  IMAQ_STDCALL imaqGetROIColor(const ROI* roi, RGBValue* roiColor);<a name="line.1040"></a>
+<span class="sourceLineNo">1041</span>    //IMAQ_FUNC ROI* IMAQ_STDCALL imaqGetWindowROI(int windowNumber);<a name="line.1041"></a>
+<span class="sourceLineNo">1042</span>    //IMAQ_FUNC int  IMAQ_STDCALL imaqSetROIColor(ROI* roi, const RGBValue* color);<a name="line.1042"></a>
+<span class="sourceLineNo">1043</span>    //IMAQ_FUNC int  IMAQ_STDCALL imaqSetWindowROI(int windowNumber, const ROI* roi);<a name="line.1043"></a>
+<span class="sourceLineNo">1044</span><a name="line.1044"></a>
+<span class="sourceLineNo">1045</span>    //============================================================================<a name="line.1045"></a>
+<span class="sourceLineNo">1046</span>    //  Image Analysis functions<a name="line.1046"></a>
+<span class="sourceLineNo">1047</span>    //============================================================================<a name="line.1047"></a>
+<span class="sourceLineNo">1048</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqCentroid(const Image* image, PointFloat* centroid, const Image* mask);<a name="line.1048"></a>
+<span class="sourceLineNo">1049</span>    //IMAQ_FUNC Curve*           IMAQ_STDCALL imaqExtractCurves(const Image* image, const ROI* roi, const CurveOptions* curveOptions, unsigned int* numCurves);<a name="line.1049"></a>
+<span class="sourceLineNo">1050</span>    //IMAQ_FUNC HistogramReport* IMAQ_STDCALL imaqHistogram(const Image* image, int numClasses, float min, float max, const Image* mask);<a name="line.1050"></a>
+<span class="sourceLineNo">1051</span>    <a name="line.1051"></a>
+<span class="sourceLineNo">1052</span>    private static final BlockingFunction imaqLinearAverages2Fn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqLinearAverages2");<a name="line.1052"></a>
+<span class="sourceLineNo">1053</span>    <a name="line.1053"></a>
+<span class="sourceLineNo">1054</span>    public static LinearAverages getLinearAverages(Pointer image, LinearAverages.LinearAveragesMode mode, Rect rect) throws NIVisionException<a name="line.1054"></a>
+<span class="sourceLineNo">1055</span>    { <a name="line.1055"></a>
+<span class="sourceLineNo">1056</span>       int returnedAddress = imaqLinearAverages2Fn.call3(image, mode.value, rect.getPointer());<a name="line.1056"></a>
+<span class="sourceLineNo">1057</span>       <a name="line.1057"></a>
+<span class="sourceLineNo">1058</span>       try {<a name="line.1058"></a>
+<span class="sourceLineNo">1059</span>            assertCleanStatus(returnedAddress);<a name="line.1059"></a>
+<span class="sourceLineNo">1060</span>       } catch (NIVisionException ex) {<a name="line.1060"></a>
+<span class="sourceLineNo">1061</span>            if (!ex.getMessage().equals("No error."))<a name="line.1061"></a>
+<span class="sourceLineNo">1062</span>                throw ex;<a name="line.1062"></a>
+<span class="sourceLineNo">1063</span>       }<a name="line.1063"></a>
+<span class="sourceLineNo">1064</span>       return null;<a name="line.1064"></a>
+<span class="sourceLineNo">1065</span>//       LinearAverages averages = new LinearAverages(returnedAddress);<a name="line.1065"></a>
+<span class="sourceLineNo">1066</span>//       NIVision.dispose(new Pointer(returnedAddress,0));<a name="line.1066"></a>
+<span class="sourceLineNo">1067</span>//       return averages;<a name="line.1067"></a>
+<span class="sourceLineNo">1068</span>    }<a name="line.1068"></a>
+<span class="sourceLineNo">1069</span>    <a name="line.1069"></a>
+<span class="sourceLineNo">1070</span>    //IMAQ_FUNC LineProfile*     IMAQ_STDCALL imaqLineProfile(const Image* image, Point start, Point end);<a name="line.1070"></a>
+<span class="sourceLineNo">1071</span>    //IMAQ_FUNC QuantifyReport*  IMAQ_STDCALL imaqQuantify(const Image* image, const Image* mask);<a name="line.1071"></a>
+<span class="sourceLineNo">1072</span><a name="line.1072"></a>
+<span class="sourceLineNo">1073</span>    //============================================================================<a name="line.1073"></a>
+<span class="sourceLineNo">1074</span>    //  Error Management functions<a name="line.1074"></a>
+<span class="sourceLineNo">1075</span>    //============================================================================<a name="line.1075"></a>
+<span class="sourceLineNo">1076</span>    private static final BlockingFunction imaqGetLastErrorFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqGetLastError");<a name="line.1076"></a>
+<span class="sourceLineNo">1077</span>    static { imaqGetLastErrorFn.setTaskExecutor(taskExecutor);  }<a name="line.1077"></a>
+<span class="sourceLineNo">1078</span><a name="line.1078"></a>
+<span class="sourceLineNo">1079</span>    public static int getLastError(){<a name="line.1079"></a>
+<span class="sourceLineNo">1080</span>        return imaqGetLastErrorFn.call0();<a name="line.1080"></a>
+<span class="sourceLineNo">1081</span>    }<a name="line.1081"></a>
+<span class="sourceLineNo">1082</span>    protected static void assertCleanStatus (int code) throws NIVisionException {<a name="line.1082"></a>
+<span class="sourceLineNo">1083</span>        if (code == 0) {<a name="line.1083"></a>
+<span class="sourceLineNo">1084</span>            throw new NIVisionException(imaqGetLastErrorFn.call0());<a name="line.1084"></a>
+<span class="sourceLineNo">1085</span>        }<a name="line.1085"></a>
+<span class="sourceLineNo">1086</span>    }<a name="line.1086"></a>
+<span class="sourceLineNo">1087</span><a name="line.1087"></a>
+<span class="sourceLineNo">1088</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqClearError();<a name="line.1088"></a>
+<span class="sourceLineNo">1089</span>    //IMAQ_FUNC char*       IMAQ_STDCALL imaqGetErrorText(int errorCode);<a name="line.1089"></a>
+<span class="sourceLineNo">1090</span>    //IMAQ_FUNC const char* IMAQ_STDCALL imaqGetLastErrorFunc();<a name="line.1090"></a>
+<span class="sourceLineNo">1091</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqSetError(int errorCode, const char* function);<a name="line.1091"></a>
+<span class="sourceLineNo">1092</span><a name="line.1092"></a>
+<span class="sourceLineNo">1093</span>    //============================================================================<a name="line.1093"></a>
+<span class="sourceLineNo">1094</span>    //  Threshold functions<a name="line.1094"></a>
+<span class="sourceLineNo">1095</span>    //============================================================================<a name="line.1095"></a>
+<span class="sourceLineNo">1096</span>    //IMAQ_FUNC ThresholdData* IMAQ_STDCALL imaqAutoThreshold2(Image* dest, const Image* source, int numClasses, ThresholdMethod method, const Image* mask);<a name="line.1096"></a>
+<span class="sourceLineNo">1097</span>    //IMAQ_FUNC int            IMAQ_STDCALL imaqLocalThreshold(Image* dest, const Image* source, unsigned int windowWidth, unsigned int windowHeight, LocalThresholdMethod method, double deviationWeight, ObjectType type, float replaceValue);<a name="line.1097"></a>
+<span class="sourceLineNo">1098</span>    //IMAQ_FUNC int            IMAQ_STDCALL imaqMagicWand(Image* dest, const Image* source, Point coord, float tolerance, int connectivity8, float replaceValue);<a name="line.1098"></a>
+<span class="sourceLineNo">1099</span>    //IMAQ_FUNC int            IMAQ_STDCALL imaqMultithreshold(Image* dest, const Image* source, const ThresholdData* ranges, int numRanges);<a name="line.1099"></a>
+<span class="sourceLineNo">1100</span>    //IMAQ_FUNC int            IMAQ_STDCALL imaqThreshold(Image* dest, const Image* source, float rangeMin, float rangeMax, int useNewValue, float newValue);<a name="line.1100"></a>
+<span class="sourceLineNo">1101</span><a name="line.1101"></a>
+<span class="sourceLineNo">1102</span>    //============================================================================<a name="line.1102"></a>
+<span class="sourceLineNo">1103</span>    //  Memory Management functions<a name="line.1103"></a>
+<span class="sourceLineNo">1104</span>    //============================================================================<a name="line.1104"></a>
+<span class="sourceLineNo">1105</span><a name="line.1105"></a>
+<span class="sourceLineNo">1106</span>    private static final BlockingFunction imaqDisposeFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqDispose");<a name="line.1106"></a>
+<span class="sourceLineNo">1107</span>    static { imaqDisposeFn.setTaskExecutor(taskExecutor); }<a name="line.1107"></a>
+<span class="sourceLineNo">1108</span><a name="line.1108"></a>
+<span class="sourceLineNo">1109</span>    /**<a name="line.1109"></a>
+<span class="sourceLineNo">1110</span>     * Cleans up resources associated with images, regions of interest (ROIs),<a name="line.1110"></a>
+<span class="sourceLineNo">1111</span>     * arrays, and reports that you no longer need.<a name="line.1111"></a>
+<span class="sourceLineNo">1112</span>     * After you dispose of something, you can no longer use it.<a name="line.1112"></a>
+<span class="sourceLineNo">1113</span>     * @param item The image, ROI, array, or report whose memory you want to free.<a name="line.1113"></a>
+<span class="sourceLineNo">1114</span>     */<a name="line.1114"></a>
+<span class="sourceLineNo">1115</span>    public static void dispose (Pointer item)  throws NIVisionException{<a name="line.1115"></a>
+<span class="sourceLineNo">1116</span>        assertCleanStatus(imaqDisposeFn.call1(item));<a name="line.1116"></a>
+<span class="sourceLineNo">1117</span>    }<a name="line.1117"></a>
+<span class="sourceLineNo">1118</span><a name="line.1118"></a>
+<span class="sourceLineNo">1119</span>    //============================================================================<a name="line.1119"></a>
+<span class="sourceLineNo">1120</span>    //  File I/O functions<a name="line.1120"></a>
+<span class="sourceLineNo">1121</span>    //============================================================================<a name="line.1121"></a>
+<span class="sourceLineNo">1122</span><a name="line.1122"></a>
+<span class="sourceLineNo">1123</span>    private static final BlockingFunction Priv_ReadJPEGString_CFn = NativeLibrary.getDefaultInstance().getBlockingFunction("Priv_ReadJPEGString_C");<a name="line.1123"></a>
+<span class="sourceLineNo">1124</span>    static { Priv_ReadJPEGString_CFn.setTaskExecutor(taskExecutor); }<a name="line.1124"></a>
+<span class="sourceLineNo">1125</span><a name="line.1125"></a>
+<span class="sourceLineNo">1126</span>    /**<a name="line.1126"></a>
+<span class="sourceLineNo">1127</span>     * Read a pointer to a byte array into the given image<a name="line.1127"></a>
+<span class="sourceLineNo">1128</span>     * @param image pointer to an imaq image object<a name="line.1128"></a>
+<span class="sourceLineNo">1129</span>     * @param p pointer to a byte array holding image data<a name="line.1129"></a>
+<span class="sourceLineNo">1130</span>     */<a name="line.1130"></a>
+<span class="sourceLineNo">1131</span>    public static void readJpegString(Pointer image, Pointer p) {<a name="line.1131"></a>
+<span class="sourceLineNo">1132</span>        Priv_ReadJPEGString_CFn.call3(image, p, p.getSize());<a name="line.1132"></a>
+<span class="sourceLineNo">1133</span>    }<a name="line.1133"></a>
+<span class="sourceLineNo">1134</span><a name="line.1134"></a>
+<span class="sourceLineNo">1135</span>    private static final BlockingFunction Priv_SetWriteFileAllowedFn = NativeLibrary.getDefaultInstance().getBlockingFunction("Priv_SetWriteFileAllowed");<a name="line.1135"></a>
+<span class="sourceLineNo">1136</span>    static { Priv_SetWriteFileAllowedFn.setTaskExecutor(taskExecutor); }<a name="line.1136"></a>
+<span class="sourceLineNo">1137</span><a name="line.1137"></a>
+<span class="sourceLineNo">1138</span>    /**<a name="line.1138"></a>
+<span class="sourceLineNo">1139</span>     * Set true to be able to create files on cRio<a name="line.1139"></a>
+<span class="sourceLineNo">1140</span>     * @param val true allows files to be created<a name="line.1140"></a>
+<span class="sourceLineNo">1141</span>     */<a name="line.1141"></a>
+<span class="sourceLineNo">1142</span>    public static void setWriteFileAllowed(boolean val) {<a name="line.1142"></a>
+<span class="sourceLineNo">1143</span>        Priv_SetWriteFileAllowedFn.call1(val ? 1 : 0);<a name="line.1143"></a>
+<span class="sourceLineNo">1144</span>    }<a name="line.1144"></a>
+<span class="sourceLineNo">1145</span><a name="line.1145"></a>
+<span class="sourceLineNo">1146</span>    private static final Function imaqWriteFileFn = NativeLibrary.getDefaultInstance().getFunction("imaqWriteFile");<a name="line.1146"></a>
+<span class="sourceLineNo">1147</span>//    static { imaqWriteFileFn.setTaskExecutor(taskExecutor); }<a name="line.1147"></a>
+<span class="sourceLineNo">1148</span><a name="line.1148"></a>
+<span class="sourceLineNo">1149</span>    /**<a name="line.1149"></a>
+<span class="sourceLineNo">1150</span>     * Write an image to the given file.<a name="line.1150"></a>
+<span class="sourceLineNo">1151</span>     *<a name="line.1151"></a>
+<span class="sourceLineNo">1152</span>     * Supported extensions:<a name="line.1152"></a>
+<span class="sourceLineNo">1153</span>     * .aipd or .apd AIPD<a name="line.1153"></a>
+<span class="sourceLineNo">1154</span>     * .bmp BMP<a name="line.1154"></a>
+<span class="sourceLineNo">1155</span>     * .jpg or .jpeg JPEG<a name="line.1155"></a>
+<span class="sourceLineNo">1156</span>     * .jp2 JPEG2000<a name="line.1156"></a>
+<span class="sourceLineNo">1157</span>     * .png PNG<a name="line.1157"></a>
+<span class="sourceLineNo">1158</span>     * .tif or .tiff TIFF<a name="line.1158"></a>
+<span class="sourceLineNo">1159</span>     *<a name="line.1159"></a>
+<span class="sourceLineNo">1160</span>     * @param image The image to write to a file.<a name="line.1160"></a>
+<span class="sourceLineNo">1161</span>     * @param fileName The name of the destination file.<a name="line.1161"></a>
+<span class="sourceLineNo">1162</span>     */<a name="line.1162"></a>
+<span class="sourceLineNo">1163</span>    public static void writeFile(Pointer image, String fileName) throws NIVisionException {<a name="line.1163"></a>
+<span class="sourceLineNo">1164</span>        Pointer p = new Pointer(fileName.length() + 1);<a name="line.1164"></a>
+<span class="sourceLineNo">1165</span>        p.setString(0, fileName);<a name="line.1165"></a>
+<span class="sourceLineNo">1166</span>        setWriteFileAllowed(true);<a name="line.1166"></a>
+<span class="sourceLineNo">1167</span>        try {<a name="line.1167"></a>
+<span class="sourceLineNo">1168</span>            assertCleanStatus(imaqWriteFileFn.call3(image, p, 0)); //zero is unused color table<a name="line.1168"></a>
+<span class="sourceLineNo">1169</span>        } finally {<a name="line.1169"></a>
+<span class="sourceLineNo">1170</span>            p.free();<a name="line.1170"></a>
+<span class="sourceLineNo">1171</span>        }<a name="line.1171"></a>
+<span class="sourceLineNo">1172</span>    }<a name="line.1172"></a>
+<span class="sourceLineNo">1173</span><a name="line.1173"></a>
+<span class="sourceLineNo">1174</span>    /**<a name="line.1174"></a>
+<span class="sourceLineNo">1175</span>     * Write an image to the given file.<a name="line.1175"></a>
+<span class="sourceLineNo">1176</span>     *<a name="line.1176"></a>
+<span class="sourceLineNo">1177</span>     * Supported extensions:<a name="line.1177"></a>
+<span class="sourceLineNo">1178</span>     * .aipd or .apd AIPD<a name="line.1178"></a>
+<span class="sourceLineNo">1179</span>     * .bmp BMP<a name="line.1179"></a>
+<span class="sourceLineNo">1180</span>     * .jpg or .jpeg JPEG<a name="line.1180"></a>
+<span class="sourceLineNo">1181</span>     * .jp2 JPEG2000<a name="line.1181"></a>
+<span class="sourceLineNo">1182</span>     * .png PNG<a name="line.1182"></a>
+<span class="sourceLineNo">1183</span>     * .tif or .tiff TIFF<a name="line.1183"></a>
+<span class="sourceLineNo">1184</span>     *<a name="line.1184"></a>
+<span class="sourceLineNo">1185</span>     * @param image The image to write to a file.<a name="line.1185"></a>
+<span class="sourceLineNo">1186</span>     * @param fileName The name of the destination file.<a name="line.1186"></a>
+<span class="sourceLineNo">1187</span>     * @param colorTable The color table to use for 8-bit images<a name="line.1187"></a>
+<span class="sourceLineNo">1188</span>     */<a name="line.1188"></a>
+<span class="sourceLineNo">1189</span>    public static void writeFile(Pointer image, String fileName, Pointer colorTable)  throws NIVisionException{<a name="line.1189"></a>
+<span class="sourceLineNo">1190</span>        Pointer p = new Pointer(fileName.length() + 1);<a name="line.1190"></a>
+<span class="sourceLineNo">1191</span>        p.setString(0, fileName);<a name="line.1191"></a>
+<span class="sourceLineNo">1192</span>        setWriteFileAllowed(true);<a name="line.1192"></a>
+<span class="sourceLineNo">1193</span>        try {<a name="line.1193"></a>
+<span class="sourceLineNo">1194</span>            assertCleanStatus(imaqWriteFileFn.call3(image, p, colorTable)); //zero is unused color table<a name="line.1194"></a>
+<span class="sourceLineNo">1195</span>        } finally {<a name="line.1195"></a>
+<span class="sourceLineNo">1196</span>            p.free();<a name="line.1196"></a>
+<span class="sourceLineNo">1197</span>        }<a name="line.1197"></a>
+<span class="sourceLineNo">1198</span>    }<a name="line.1198"></a>
+<span class="sourceLineNo">1199</span><a name="line.1199"></a>
+<span class="sourceLineNo">1200</span>    private static final BlockingFunction imaqReadFileFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqReadFile");<a name="line.1200"></a>
+<span class="sourceLineNo">1201</span>    static { imaqReadFileFn.setTaskExecutor(taskExecutor); }<a name="line.1201"></a>
+<span class="sourceLineNo">1202</span><a name="line.1202"></a>
+<span class="sourceLineNo">1203</span>    /**<a name="line.1203"></a>
+<span class="sourceLineNo">1204</span>     * Read an image from to the given image from the given filename<a name="line.1204"></a>
+<span class="sourceLineNo">1205</span>     * @param image The image to store the data in.<a name="line.1205"></a>
+<span class="sourceLineNo">1206</span>     * @param fileName The name of the file to load.<a name="line.1206"></a>
+<span class="sourceLineNo">1207</span>     */<a name="line.1207"></a>
+<span class="sourceLineNo">1208</span>    public static void readFile(Pointer image, String fileName)  throws NIVisionException{<a name="line.1208"></a>
+<span class="sourceLineNo">1209</span>        Pointer p = new Pointer(fileName.length() + 1);<a name="line.1209"></a>
+<span class="sourceLineNo">1210</span>        p.setString(0, fileName);<a name="line.1210"></a>
+<span class="sourceLineNo">1211</span>        try {<a name="line.1211"></a>
+<span class="sourceLineNo">1212</span>            assertCleanStatus(imaqReadFileFn.call4(image, p, 0, 0)); //zeros are unused color table and num colors<a name="line.1212"></a>
+<span class="sourceLineNo">1213</span>        } finally {<a name="line.1213"></a>
+<span class="sourceLineNo">1214</span>            p.free();<a name="line.1214"></a>
+<span class="sourceLineNo">1215</span>        }<a name="line.1215"></a>
+<span class="sourceLineNo">1216</span>    }<a name="line.1216"></a>
+<span class="sourceLineNo">1217</span><a name="line.1217"></a>
+<span class="sourceLineNo">1218</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqCloseAVI(AVISession session);<a name="line.1218"></a>
+<span class="sourceLineNo">1219</span>    //IMAQ_FUNC AVISession  IMAQ_STDCALL imaqCreateAVI(const char* fileName, const char* compressionFilter, int quality, unsigned int framesPerSecond, unsigned int maxDataSize);<a name="line.1219"></a>
+<span class="sourceLineNo">1220</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqGetAVIInfo(AVISession session, AVIInfo* info);<a name="line.1220"></a>
+<span class="sourceLineNo">1221</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqGetFileInfo(const char* fileName, CalibrationUnit* calibrationUnit, float* calibrationX, float* calibrationY, int* width, int* height, ImageType* imageType);<a name="line.1221"></a>
+<span class="sourceLineNo">1222</span>    //IMAQ_FUNC FilterName* IMAQ_STDCALL imaqGetFilterNames(int* numFilters);<a name="line.1222"></a>
+<span class="sourceLineNo">1223</span>    //IMAQ_FUNC char**      IMAQ_STDCALL imaqLoadImagePopup(const char* defaultDirectory, const char* defaultFileSpec, const char* fileTypeList, const char* title, int allowMultiplePaths, ButtonLabel buttonLabel, int restrictDirectory, int restrictExtension, int allowCancel, int allowMakeDirectory, int* cancelled, int* numPaths);<a name="line.1223"></a>
+<span class="sourceLineNo">1224</span>    //IMAQ_FUNC AVISession  IMAQ_STDCALL imaqOpenAVI(const char* fileName);<a name="line.1224"></a>
+<span class="sourceLineNo">1225</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqReadAVIFrame(Image* image, AVISession session, unsigned int frameNum, void* data, unsigned int* dataSize);<a name="line.1225"></a>
+<span class="sourceLineNo">1226</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqReadVisionFile(Image* image, const char* fileName, RGBValue* colorTable, int* numColors);<a name="line.1226"></a>
+<span class="sourceLineNo">1227</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqWriteAVIFrame(Image* image, AVISession session, const void* data, unsigned int dataLength);<a name="line.1227"></a>
+<span class="sourceLineNo">1228</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqWriteBMPFile(const Image* image, const char* fileName, int compress, const RGBValue* colorTable);<a name="line.1228"></a>
+<span class="sourceLineNo">1229</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqWriteJPEGFile(const Image* image, const char* fileName, unsigned int quality, void* colorTable);<a name="line.1229"></a>
+<span class="sourceLineNo">1230</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqWriteJPEG2000File(const Image* image, const char* fileName, int lossless, float compressionRatio, const JPEG2000FileAdvancedOptions* advancedOptions, const RGBValue* colorTable);<a name="line.1230"></a>
+<span class="sourceLineNo">1231</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqWritePNGFile2(const Image* image, const char* fileName, unsigned int compressionSpeed, const RGBValue* colorTable, int useBitDepth);<a name="line.1231"></a>
+<span class="sourceLineNo">1232</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqWriteTIFFFile(const Image* image, const char* fileName, const TIFFFileOptions* options, const RGBValue* colorTable);<a name="line.1232"></a>
+<span class="sourceLineNo">1233</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqWriteVisionFile(const Image* image, const char* fileName, const RGBValue* colorTable);<a name="line.1233"></a>
+<span class="sourceLineNo">1234</span><a name="line.1234"></a>
+<span class="sourceLineNo">1235</span><a name="line.1235"></a>
+<span class="sourceLineNo">1236</span>    //============================================================================<a name="line.1236"></a>
+<span class="sourceLineNo">1237</span>    //  Frequency Domain Analysis functions<a name="line.1237"></a>
+<span class="sourceLineNo">1238</span>    //============================================================================<a name="line.1238"></a>
+<span class="sourceLineNo">1239</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqAttenuate(Image* dest, const Image* source, AttenuateMode highlow);<a name="line.1239"></a>
+<span class="sourceLineNo">1240</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqConjugate(Image* dest, const Image* source);<a name="line.1240"></a>
+<span class="sourceLineNo">1241</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqFFT(Image* dest, const Image* source);<a name="line.1241"></a>
+<span class="sourceLineNo">1242</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqFlipFrequencies(Image* dest, const Image* source);<a name="line.1242"></a>
+<span class="sourceLineNo">1243</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqInverseFFT(Image* dest, const Image* source);<a name="line.1243"></a>
+<span class="sourceLineNo">1244</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqTruncate(Image* dest, const Image* source, TruncateMode highlow, float ratioToKeep);<a name="line.1244"></a>
+<span class="sourceLineNo">1245</span><a name="line.1245"></a>
+<span class="sourceLineNo">1246</span>    //============================================================================<a name="line.1246"></a>
+<span class="sourceLineNo">1247</span>    //  Pixel Manipulation functions<a name="line.1247"></a>
+<span class="sourceLineNo">1248</span>    //============================================================================<a name="line.1248"></a>
+<span class="sourceLineNo">1249</span><a name="line.1249"></a>
+<span class="sourceLineNo">1250</span>    private static final BlockingFunction imaqExtractColorPlanesFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqExtractColorPlanes");<a name="line.1250"></a>
+<span class="sourceLineNo">1251</span>    static { imaqExtractColorPlanesFn.setTaskExecutor(taskExecutor); }<a name="line.1251"></a>
+<span class="sourceLineNo">1252</span><a name="line.1252"></a>
+<span class="sourceLineNo">1253</span>    /**<a name="line.1253"></a>
+<span class="sourceLineNo">1254</span>     * Extract the color planes from the given source image into the given planes<a name="line.1254"></a>
+<span class="sourceLineNo">1255</span>     * @param source The color source image.<a name="line.1255"></a>
+<span class="sourceLineNo">1256</span>     * @param mode The color space to extract the planes of.<a name="line.1256"></a>
+<span class="sourceLineNo">1257</span>     * @param plane1 MonoImage destination for the first plane.<a name="line.1257"></a>
+<span class="sourceLineNo">1258</span>     * @param plane2 MonoImage destination for the first plane.<a name="line.1258"></a>
+<span class="sourceLineNo">1259</span>     * @param plane3 MonoImage destination for the first plane.<a name="line.1259"></a>
+<span class="sourceLineNo">1260</span>     */<a name="line.1260"></a>
+<span class="sourceLineNo">1261</span>    public static void extractColorPlanes(Pointer source, ColorMode mode, Pointer plane1, Pointer plane2, Pointer plane3)  throws NIVisionException{<a name="line.1261"></a>
+<span class="sourceLineNo">1262</span>        int plane_1 = 0;<a name="line.1262"></a>
+<span class="sourceLineNo">1263</span>        int plane_2 = 0;<a name="line.1263"></a>
+<span class="sourceLineNo">1264</span>        int plane_3 = 0;<a name="line.1264"></a>
+<span class="sourceLineNo">1265</span>        if (plane1 != null)<a name="line.1265"></a>
+<span class="sourceLineNo">1266</span>            plane_1 = plane1.address().toUWord().toPrimitive();<a name="line.1266"></a>
+<span class="sourceLineNo">1267</span>        if (plane2 != null)<a name="line.1267"></a>
+<span class="sourceLineNo">1268</span>            plane_2 = plane2.address().toUWord().toPrimitive();<a name="line.1268"></a>
+<span class="sourceLineNo">1269</span>        if (plane3 != null)<a name="line.1269"></a>
+<span class="sourceLineNo">1270</span>            plane_3 = plane3.address().toUWord().toPrimitive();<a name="line.1270"></a>
+<span class="sourceLineNo">1271</span>        assertCleanStatus(imaqExtractColorPlanesFn.call5(source, mode.value, plane_1, plane_2, plane_3));<a name="line.1271"></a>
+<span class="sourceLineNo">1272</span>    }<a name="line.1272"></a>
+<span class="sourceLineNo">1273</span><a name="line.1273"></a>
+<span class="sourceLineNo">1274</span>    private static final BlockingFunction imaqReplaceColorPlanesFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqReplaceColorPlanes");<a name="line.1274"></a>
+<span class="sourceLineNo">1275</span>    static { imaqReplaceColorPlanesFn.setTaskExecutor(taskExecutor); }<a name="line.1275"></a>
+<span class="sourceLineNo">1276</span><a name="line.1276"></a>
+<span class="sourceLineNo">1277</span>    /**<a name="line.1277"></a>
+<span class="sourceLineNo">1278</span>     * Replaces one or more of the color planes of a color image. The plane you<a name="line.1278"></a>
+<span class="sourceLineNo">1279</span>     * replace may be independent of the image type. For example, you can<a name="line.1279"></a>
+<span class="sourceLineNo">1280</span>     * replace the green plane of an RGB image or the hue plane of an HSL image.<a name="line.1280"></a>
+<span class="sourceLineNo">1281</span>     * @param dest The destination image.<a name="line.1281"></a>
+<span class="sourceLineNo">1282</span>     * @param source The source image.<a name="line.1282"></a>
+<span class="sourceLineNo">1283</span>     * @param mode The color space in which the function replaces planes.<a name="line.1283"></a>
+<span class="sourceLineNo">1284</span>     * @param plane1 The first plane of replacement data. Set this parameter to null if you do not want to change the first plane of the source image.<a name="line.1284"></a>
+<span class="sourceLineNo">1285</span>     * @param plane2 The second plane of replacement data. Set this parameter to null if you do not want to change the second plane of the source image.<a name="line.1285"></a>
+<span class="sourceLineNo">1286</span>     * @param plane3 The third plane of replacement data. Set this parameter to null if you do not want to change the third plane of the source image.<a name="line.1286"></a>
+<span class="sourceLineNo">1287</span>     */<a name="line.1287"></a>
+<span class="sourceLineNo">1288</span>    public static void replaceColorPlanes(Pointer dest, Pointer source,<a name="line.1288"></a>
+<span class="sourceLineNo">1289</span>            ColorMode mode, Pointer plane1, Pointer plane2, Pointer plane3)  throws NIVisionException{<a name="line.1289"></a>
+<span class="sourceLineNo">1290</span>        int plane_1 = 0;<a name="line.1290"></a>
+<span class="sourceLineNo">1291</span>        int plane_2 = 0;<a name="line.1291"></a>
+<span class="sourceLineNo">1292</span>        int plane_3 = 0;<a name="line.1292"></a>
+<span class="sourceLineNo">1293</span>        if (plane1 != null)<a name="line.1293"></a>
+<span class="sourceLineNo">1294</span>            plane_1 = plane1.address().toUWord().toPrimitive();<a name="line.1294"></a>
+<span class="sourceLineNo">1295</span>        if (plane2 != null)<a name="line.1295"></a>
+<span class="sourceLineNo">1296</span>            plane_2 = plane2.address().toUWord().toPrimitive();<a name="line.1296"></a>
+<span class="sourceLineNo">1297</span>        if (plane3 != null)<a name="line.1297"></a>
+<span class="sourceLineNo">1298</span>            plane_3 = plane3.address().toUWord().toPrimitive();<a name="line.1298"></a>
+<span class="sourceLineNo">1299</span>        assertCleanStatus(imaqReplaceColorPlanesFn.call6(<a name="line.1299"></a>
+<span class="sourceLineNo">1300</span>                dest.address().toUWord().toPrimitive(),<a name="line.1300"></a>
+<span class="sourceLineNo">1301</span>                source.address().toUWord().toPrimitive(),<a name="line.1301"></a>
+<span class="sourceLineNo">1302</span>                mode.value,<a name="line.1302"></a>
+<span class="sourceLineNo">1303</span>                plane_1,<a name="line.1303"></a>
+<span class="sourceLineNo">1304</span>                plane_2,<a name="line.1304"></a>
+<span class="sourceLineNo">1305</span>                plane_3));<a name="line.1305"></a>
+<span class="sourceLineNo">1306</span>    }<a name="line.1306"></a>
+<span class="sourceLineNo">1307</span><a name="line.1307"></a>
+<span class="sourceLineNo">1308</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqArrayToComplexPlane(Image* dest, const Image* source, const float* newPixels, ComplexPlane plane);<a name="line.1308"></a>
+<span class="sourceLineNo">1309</span>    //IMAQ_FUNC float* IMAQ_STDCALL imaqComplexPlaneToArray(const Image* image, ComplexPlane plane, Rect rect, int* columns, int* rows);<a name="line.1309"></a>
+<span class="sourceLineNo">1310</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqExtractComplexPlane(Image* dest, const Image* source, ComplexPlane plane);<a name="line.1310"></a>
+<span class="sourceLineNo">1311</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqFillImage(Image* image, PixelValue value, const Image* mask);<a name="line.1311"></a>
+<span class="sourceLineNo">1312</span>    //IMAQ_FUNC void*  IMAQ_STDCALL imaqGetLine(const Image* image, Point start, Point end, int* numPoints);<a name="line.1312"></a>
+<span class="sourceLineNo">1313</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqGetPixel(const Image* image, Point pixel, PixelValue* value);<a name="line.1313"></a>
+<span class="sourceLineNo">1314</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqReplaceComplexPlane(Image* dest, const Image* source, const Image* newValues, ComplexPlane plane);<a name="line.1314"></a>
+<span class="sourceLineNo">1315</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqSetLine(Image* image, const void* array, int arraySize, Point start, Point end);<a name="line.1315"></a>
+<span class="sourceLineNo">1316</span>    //IMAQ_FUNC int    IMAQ_STDCALL imaqSetPixel(Image* image, Point coord, PixelValue value);<a name="line.1316"></a>
+<span class="sourceLineNo">1317</span><a name="line.1317"></a>
+<span class="sourceLineNo">1318</span>    //============================================================================<a name="line.1318"></a>
+<span class="sourceLineNo">1319</span>    //  LCD functions<a name="line.1319"></a>
+<span class="sourceLineNo">1320</span>    //============================================================================<a name="line.1320"></a>
+<span class="sourceLineNo">1321</span>    //IMAQ_FUNC int        IMAQ_STDCALL imaqFindLCDSegments(ROI* roi, const Image* image, const LCDOptions* options);<a name="line.1321"></a>
+<span class="sourceLineNo">1322</span>    //IMAQ_FUNC LCDReport* IMAQ_STDCALL imaqReadLCD(const Image* image, const ROI* roi, const LCDOptions* options);<a name="line.1322"></a>
+<span class="sourceLineNo">1323</span><a name="line.1323"></a>
+<span class="sourceLineNo">1324</span>    //============================================================================<a name="line.1324"></a>
+<span class="sourceLineNo">1325</span>    //  Regions of Interest Manipulation functions<a name="line.1325"></a>
+<span class="sourceLineNo">1326</span>    //============================================================================<a name="line.1326"></a>
+<span class="sourceLineNo">1327</span>    //IMAQ_FUNC ROI*        IMAQ_STDCALL imaqMaskToROI(const Image* mask, int* withinLimit);<a name="line.1327"></a>
+<span class="sourceLineNo">1328</span>    //IMAQ_FUNC ROIProfile* IMAQ_STDCALL imaqROIProfile(const Image* image, const ROI* roi);<a name="line.1328"></a>
+<span class="sourceLineNo">1329</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqROIToMask(Image* mask, const ROI* roi, int fillValue, const Image* imageModel, int* inSpace);<a name="line.1329"></a>
+<span class="sourceLineNo">1330</span>    //IMAQ_FUNC int         IMAQ_STDCALL imaqTransformROI2(ROI* roi, const CoordinateSystem* baseSystem, const CoordinateSystem* newSystem);<a name="line.1330"></a>
+<span class="sourceLineNo">1331</span><a name="line.1331"></a>
+<span class="sourceLineNo">1332</span>    //============================================================================<a name="line.1332"></a>
+<span class="sourceLineNo">1333</span>    //  OCR functions<a name="line.1333"></a>
+<span class="sourceLineNo">1334</span>    //============================================================================<a name="line.1334"></a>
+<span class="sourceLineNo">1335</span>    //IMAQ_FUNC CharSet*         IMAQ_STDCALL imaqCreateCharSet();<a name="line.1335"></a>
+<span class="sourceLineNo">1336</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqDeleteChar(CharSet* set, int index);<a name="line.1336"></a>
+<span class="sourceLineNo">1337</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqGetCharCount(const CharSet* set);<a name="line.1337"></a>
+<span class="sourceLineNo">1338</span>    //IMAQ_FUNC CharInfo2*       IMAQ_STDCALL imaqGetCharInfo2(const CharSet* set, int index);<a name="line.1338"></a>
+<span class="sourceLineNo">1339</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqReadOCRFile(const char* fileName, CharSet* set, String255 setDescription, ReadTextOptions* readOptions, OCRProcessingOptions* processingOptions, OCRSpacingOptions* spacingOptions);<a name="line.1339"></a>
+<span class="sourceLineNo">1340</span>    //IMAQ_FUNC ReadTextReport3* IMAQ_STDCALL imaqReadText3(const Image* image, const CharSet* set, const ROI* roi, const ReadTextOptions* readOptions, const OCRProcessingOptions* processingOptions, const OCRSpacingOptions* spacingOptions);<a name="line.1340"></a>
+<span class="sourceLineNo">1341</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqRenameChar(CharSet* set, int index, const char* newCharValue);<a name="line.1341"></a>
+<span class="sourceLineNo">1342</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqSetReferenceChar(const CharSet* set, int index, int isReferenceChar);<a name="line.1342"></a>
+<span class="sourceLineNo">1343</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqTrainChars(const Image* image, CharSet* set, int index, const char* charValue, const ROI* roi, const OCRProcessingOptions* processingOptions, const OCRSpacingOptions* spacingOptions);<a name="line.1343"></a>
+<span class="sourceLineNo">1344</span>    //IMAQ_FUNC int*             IMAQ_STDCALL imaqVerifyPatterns(const Image* image, const CharSet* set, const String255* expectedPatterns, int patternCount, const ROI* roi, int* numScores);<a name="line.1344"></a>
+<span class="sourceLineNo">1345</span>    //IMAQ_FUNC int*             IMAQ_STDCALL imaqVerifyText(const Image* image, const CharSet* set, const char* expectedString, const ROI* roi, int* numScores);<a name="line.1345"></a>
+<span class="sourceLineNo">1346</span>    //IMAQ_FUNC int              IMAQ_STDCALL imaqWriteOCRFile(const char* fileName, const CharSet* set, const char* setDescription, const ReadTextOptions* readOptions, const OCRProcessingOptions* processingOptions, const OCRSpacingOptions* spacingOptions);<a name="line.1346"></a>
+<span class="sourceLineNo">1347</span><a name="line.1347"></a>
+<span class="sourceLineNo">1348</span>    //============================================================================<a name="line.1348"></a>
+<span class="sourceLineNo">1349</span>    //  Classification functions<a name="line.1349"></a>
+<span class="sourceLineNo">1350</span>    //============================================================================<a name="line.1350"></a>
+<span class="sourceLineNo">1351</span>    //IMAQ_FUNC int                            IMAQ_STDCALL imaqAddClassifierSample(Image* image, ClassifierSession* session, const ROI* roi, const char* sampleClass, double* featureVector, unsigned int vectorSize);<a name="line.1351"></a>
+<span class="sourceLineNo">1352</span>    //IMAQ_FUNC ClassifierReport*              IMAQ_STDCALL imaqClassify(Image* image, const ClassifierSession* session, const ROI* roi, double* featureVector, unsigned int vectorSize);<a name="line.1352"></a>
+<span class="sourceLineNo">1353</span>    //IMAQ_FUNC ClassifierSession*             IMAQ_STDCALL imaqCreateClassifier(ClassifierType type);<a name="line.1353"></a>
+<span class="sourceLineNo">1354</span>    //IMAQ_FUNC int                            IMAQ_STDCALL imaqDeleteClassifierSample(ClassifierSession* session, int index);<a name="line.1354"></a>
+<span class="sourceLineNo">1355</span>    //IMAQ_FUNC ClassifierAccuracyReport*      IMAQ_STDCALL imaqGetClassifierAccuracy(const ClassifierSession* session);<a name="line.1355"></a>
+<span class="sourceLineNo">1356</span>    //IMAQ_FUNC ClassifierSampleInfo*          IMAQ_STDCALL imaqGetClassifierSampleInfo(const ClassifierSession* session, int index, int* numSamples);<a name="line.1356"></a>
+<span class="sourceLineNo">1357</span>    //IMAQ_FUNC int                            IMAQ_STDCALL imaqGetNearestNeighborOptions(const ClassifierSession* session, NearestNeighborOptions* options);<a name="line.1357"></a>
+<span class="sourceLineNo">1358</span>    //IMAQ_FUNC int                            IMAQ_STDCALL imaqGetParticleClassifierOptions(const ClassifierSession* session, ParticleClassifierPreprocessingOptions* preprocessingOptions, ParticleClassifierOptions* options);<a name="line.1358"></a>
+<span class="sourceLineNo">1359</span>    //IMAQ_FUNC ClassifierSession*             IMAQ_STDCALL imaqReadClassifierFile(ClassifierSession* session, const char* fileName, ReadClassifierFileMode mode, ClassifierType* type, ClassifierEngineType* engine, String255 description);<a name="line.1359"></a>
+<span class="sourceLineNo">1360</span>    //IMAQ_FUNC int                            IMAQ_STDCALL imaqRelabelClassifierSample(ClassifierSession* session, int index, const char* newClass);<a name="line.1360"></a>
+<span class="sourceLineNo">1361</span>    //IMAQ_FUNC int                            IMAQ_STDCALL imaqSetParticleClassifierOptions(ClassifierSession* session, const ParticleClassifierPreprocessingOptions* preprocessingOptions, const ParticleClassifierOptions* options);<a name="line.1361"></a>
+<span class="sourceLineNo">1362</span>    //IMAQ_FUNC NearestNeighborTrainingReport* IMAQ_STDCALL imaqTrainNearestNeighborClassifier(ClassifierSession* session, const NearestNeighborOptions* options);<a name="line.1362"></a>
+<span class="sourceLineNo">1363</span>    //IMAQ_FUNC int                            IMAQ_STDCALL imaqWriteClassifierFile(const ClassifierSession* session, const char* fileName, WriteClassifierFileMode mode, const String255 description);<a name="line.1363"></a>
+<span class="sourceLineNo">1364</span><a name="line.1364"></a>
+<span class="sourceLineNo">1365</span>    //============================================================================<a name="line.1365"></a>
+<span class="sourceLineNo">1366</span>    //  Inspection functions<a name="line.1366"></a>
+<span class="sourceLineNo">1367</span>    //============================================================================<a name="line.1367"></a>
+<span class="sourceLineNo">1368</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqCompareGoldenTemplate(const Image* image, Image* goldenTemplate, Image* brightDefects, Image* darkDefects, const InspectionAlignment* alignment, const InspectionOptions* options);<a name="line.1368"></a>
+<span class="sourceLineNo">1369</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqLearnGoldenTemplate(Image* goldenTemplate, PointFloat originOffset, const Image* mask);<a name="line.1369"></a>
+<span class="sourceLineNo">1370</span><a name="line.1370"></a>
+<span class="sourceLineNo">1371</span>    //============================================================================<a name="line.1371"></a>
+<span class="sourceLineNo">1372</span>    //  Morphology functions<a name="line.1372"></a>
+<span class="sourceLineNo">1373</span>    //============================================================================<a name="line.1373"></a>
+<span class="sourceLineNo">1374</span>    //IMAQ_FUNC int IMAQ_STDCALL imaqGrayMorphology(Image* dest, Image* source, MorphologyMethod method, const StructuringElement* structuringElement);<a name="line.1374"></a>
+<span class="sourceLineNo">1375</span><a name="line.1375"></a>
+<span class="sourceLineNo">1376</span>    private static final int FN_DILATE = 2;<a name="line.1376"></a>
+<span class="sourceLineNo">1377</span>    <a name="line.1377"></a>
+<span class="sourceLineNo">1378</span>    private static final BlockingFunction imaqGrayMorphologyFn = NativeLibrary.getDefaultInstance().getBlockingFunction("imaqGrayMorphology");<a name="line.1378"></a>
+<span class="sourceLineNo">1379</span>    static { imaqGrayMorphologyFn.setTaskExecutor(taskExecutor); }<a name="line.1379"></a>
+<span class="sourceLineNo">1380</span>    <a name="line.1380"></a>
+<span class="sourceLineNo">1381</span>    public static void dilate(Pointer dest, Pointer source, int count) throws NIVisionException {<a name="line.1381"></a>
+<span class="sourceLineNo">1382</span>        assertCleanStatus(imaqGrayMorphologyFn.call4(dest.address().toUWord().toPrimitive(),<a name="line.1382"></a>
+<span class="sourceLineNo">1383</span>                                                source.address().toUWord().toPrimitive(),<a name="line.1383"></a>
+<span class="sourceLineNo">1384</span>                                                FN_DILATE,<a name="line.1384"></a>
+<span class="sourceLineNo">1385</span>                                                0));<a name="line.1385"></a>
+<span class="sourceLineNo">1386</span>        if(--count &gt; 0){<a name="line.1386"></a>
+<span class="sourceLineNo">1387</span>            while(count --&gt; 0){<a name="line.1387"></a>
+<span class="sourceLineNo">1388</span>                assertCleanStatus(imaqGrayMorphologyFn.call4(dest.address().toUWord().toPrimitive(),<a name="line.1388"></a>
+<span class="sourceLineNo">1389</span>                                                        dest.address().toUWord().toPrimitive(),<a name="line.1389"></a>
+<span class="sourceLineNo">1390</span>                                                        FN_DILATE,<a name="line.1390"></a>
+<span class="sourceLineNo">1391</span>                                                        0));<a name="line.1391"></a>
+<span class="sourceLineNo">1392</span>            }<a name="line.1392"></a>
+<span class="sourceLineNo">1393</span>        }<a name="line.1393"></a>
+<span class="sourceLineNo">1394</span>    }<a name="line.1394"></a>
+<span class="sourceLineNo">1395</span>}<a name="line.1395"></a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</body>
+</html>
